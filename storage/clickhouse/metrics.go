@@ -4,17 +4,15 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"time"
-
 	_ "github.com/ClickHouse/clickhouse-go/v2"
 	"github.com/joeecarter/health-import-server/request"
 )
 
 type ClickHouseConfig struct {
-	DSN           string `json:"dsn"`
-	Database      string `json:"database"`
-	MetricsTable  string `json:"metrics_table"`
-	CreateTables  bool   `json:"create_tables"`
+	DSN          string `json:"dsn"`
+	Database     string `json:"database"`
+	MetricsTable string `json:"metrics_table"`
+	CreateTables bool   `json:"create_tables"`
 }
 
 type ClickHouseMetricStore struct {
@@ -76,11 +74,11 @@ func (store *ClickHouseMetricStore) Store(metrics []request.Metric) error {
 		metricType := request.LookupMetricType(metric.Name)
 		for _, sample := range metric.Samples {
 			timestamp := sample.GetTimestamp().ToTime()
-			
+
 			// Default values
 			var qty, max, min, avg, asleep, inBed float64
 			var sleepSource, inBedSource string
-			
+
 			// Set values based on sample type
 			switch s := sample.(type) {
 			case *request.QtySample:
@@ -95,8 +93,8 @@ func (store *ClickHouseMetricStore) Store(metrics []request.Metric) error {
 				sleepSource = s.SleepSource
 				inBedSource = s.InBedSource
 			}
-			
-			_, err = stmt.ExecContext(ctx, 
+
+			_, err = stmt.ExecContext(ctx,
 				timestamp,
 				metric.Name,
 				metric.Unit,
