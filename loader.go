@@ -8,18 +8,18 @@ import (
 	"os"
 	"strings"
 
-	"github.com/joeecarter/health-import-server/storage/influxdb"
+	"github.com/joeecarter/health-import-server/storage/clickhouse"
 )
 
-const INFLUX_HOSTNAME = "INFLUX_HOSTNAME"
-const INFLUX_BUCKET = "INFLUX_BUCKET"
-const INFLUX_TOKEN = "INFLUX_TOKEN"
-const INFLUX_ORG = "INFLUX_ORG"
+const CLICKHOUSE_DSN = "CLICKHOUSE_DSN"
+const CLICKHOUSE_DATABASE = "CLICKHOUSE_DATABASE"
+const CLICKHOUSE_METRICS_TABLE = "CLICKHOUSE_METRICS_TABLE"
+const CLICKHOUSE_CREATE_TABLES = "CLICKHOUSE_CREATE_TABLES"
 
 type metricStoreLoader func(json.RawMessage) (MetricStore, error)
 
 var metricStoreLoaders = map[string]metricStoreLoader{
-	"influxdb": loadInfluxMetricStoreFromConfig,
+	"clickhouse": loadClickHouseMetricStoreFromConfig,
 }
 
 type configType struct {
@@ -80,25 +80,29 @@ func LoadMetricStoresFromConfig(filename string) ([]MetricStore, error) {
 }
 
 func LoadMetricStoresFromEnvironment() ([]MetricStore, error) {
-	metricStore, err := loadInfluxMetricStoreFromEnvironment()
+	clickhouseStore, err := loadClickHouseMetricStoreFromEnvironment()
 	if err != nil {
 		return nil, err
 	}
 
 	var metricStores []MetricStore
-	if metricStore != nil {
-		metricStores = []MetricStore{metricStore}
+	if clickhouseStore != nil {
+		metricStores = append(metricStores, clickhouseStore)
 	}
 
 	return metricStores, nil
 }
 
-func loadInfluxMetricStoreFromConfig(msg json.RawMessage) (MetricStore, error) {
-	var config influxdb.InfluxConfig
+func loadClickHouseMetricStoreFromConfig(msg json.RawMessage) (MetricStore, error) {
+	var config clickhouse.ClickHouseConfig
 	if err := json.Unmarshal(msg, &config); err != nil {
 		return nil, err
 	}
-	return influxdb.NewInfluxMetricStore(config), nil
+	store, err := clickhouse.NewClickHouseMetricStore(config)
+	if err != nil {
+		return nil, err
+	}
+	return store, nil
 }
 
 func getConfigType(msg json.RawMessage) (string, error) {
@@ -109,43 +113,48 @@ func getConfigType(msg json.RawMessage) (string, error) {
 	return config.Type, nil
 }
 
-func loadInfluxMetricStoreFromEnvironment() (MetricStore, error) {
-	hostname, hostnameSet := os.LookupEnv(INFLUX_HOSTNAME)
-	bucket, bucketSet := os.LookupEnv(INFLUX_BUCKET)
-	token, tokenSet := os.LookupEnv(INFLUX_TOKEN)
-	org, orgSet := os.LookupEnv(INFLUX_ORG)
+func loadClickHouseMetricStoreFromEnvironment() (MetricStore, error) {
+	dsn, dsnSet := os.LookupEnv(CLICKHOUSE_DSN)
+	database, databaseSet := os.LookupEnv(CLICKHOUSE_DATABASE)
+	metricsTable, metricsTableSet := os.LookupEnv(CLICKHOUSE_METRICS_TABLE)
+	createTablesStr, createTablesSet := os.LookupEnv(CLICKHOUSE_CREATE_TABLES)
 
-	if !hostnameSet && !tokenSet && !orgSet && !bucketSet {
+	if !dsnSet && !databaseSet && !metricsTableSet {
 		return nil, nil
 	}
 
 	missingVariables := make([]string, 0)
-	if !hostnameSet {
-		missingVariables = append(missingVariables, INFLUX_HOSTNAME)
+	if !dsnSet {
+		missingVariables = append(missingVariables, CLICKHOUSE_DSN)
 	}
-	if !bucketSet {
-		missingVariables = append(missingVariables, INFLUX_BUCKET)
+	if !databaseSet {
+		missingVariables = append(missingVariables, CLICKHOUSE_DATABASE)
 	}
-	if !tokenSet {
-		missingVariables = append(missingVariables, INFLUX_TOKEN)
-	}
-	if !orgSet {
-		missingVariables = append(missingVariables, INFLUX_ORG)
+	if !metricsTableSet {
+		missingVariables = append(missingVariables, CLICKHOUSE_METRICS_TABLE)
 	}
 
 	if len(missingVariables) > 0 {
 		return nil, missingEnvironmentError{missingVariables}
 	}
 
-	//fmt.Printf("hostname = '%s', bucket = '%s', token = '%s', org = '%s'\n", hostname, bucket, token, org)
-
-	config := influxdb.InfluxConfig{
-		Hostname: hostname,
-		Token:    token,
-		Org:      org,
-		Bucket:   bucket,
+	createTables := false
+	if createTablesSet && (createTablesStr == "true" || createTablesStr == "1" || createTablesStr == "yes") {
+		createTables = true
 	}
-	return influxdb.NewInfluxMetricStore(config), nil
+
+	config := clickhouse.ClickHouseConfig{
+		DSN:          dsn,
+		Database:     database,
+		MetricsTable: metricsTable,
+		CreateTables: createTables,
+	}
+
+	store, err := clickhouse.NewClickHouseMetricStore(config)
+	if err != nil {
+		return nil, err
+	}
+	return store, nil
 }
 
 func logUnknownLoaderType(loaderType string, config json.RawMessage) {
