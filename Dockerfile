@@ -1,4 +1,4 @@
-FROM golang:1.16 AS builder
+FROM golang:1.22 AS builder
 ARG VERSION=0.0.0
 WORKDIR /go/src/github.com/joeecarter/health-import-server/
 COPY . .
