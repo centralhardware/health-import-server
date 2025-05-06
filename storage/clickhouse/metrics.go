@@ -482,25 +482,58 @@ func (store *ClickHouseMetricStore) StoreWorkouts(workouts []request.Workout) er
 				VALUES 
 			`, store.database, store.workoutsTable))
 
-			// Add placeholders for each row in the batch
+			// Add values for each row in the batch
 			for i := batchStart; i < batchEnd; i++ {
+				startIdx := i * 33
+
+				// Format timestamps
+				start := workoutValues[startIdx+1].(time.Time).Format("2006-01-02 15:04:05")
+				end := workoutValues[startIdx+2].(time.Time).Format("2006-01-02 15:04:05")
+
 				if i > batchStart {
 					query.WriteString(", ")
 				}
-				query.WriteString("(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
-			}
 
-			// Extract the values for this batch
-			batchValues := make([]interface{}, 0, (batchEnd-batchStart)*33)
-			for i := batchStart; i < batchEnd; i++ {
-				startIdx := i * 33
-				for j := 0; j < 33; j++ {
-					batchValues = append(batchValues, workoutValues[startIdx+j])
-				}
+				// Use direct value interpolation to avoid Float64 parsing issues
+				query.WriteString(fmt.Sprintf("('%s', toDateTime('%s'), toDateTime('%s'), %f, '%s', %f, '%s', %f, '%s', %f, '%s', %f, '%s', %f, '%s', %f, '%s', %f, '%s', %f, '%s', %f, '%s', %f, '%s', %f, '%s', %f, '%s', %f, '%s', %f, %f, '%s')",
+					workoutValues[startIdx].(string),
+					start,
+					end,
+					workoutValues[startIdx+3].(float64),
+					workoutValues[startIdx+4].(string),
+					workoutValues[startIdx+5].(float64),
+					workoutValues[startIdx+6].(string),
+					workoutValues[startIdx+7].(float64),
+					workoutValues[startIdx+8].(string),
+					workoutValues[startIdx+9].(float64),
+					workoutValues[startIdx+10].(string),
+					workoutValues[startIdx+11].(float64),
+					workoutValues[startIdx+12].(string),
+					workoutValues[startIdx+13].(float64),
+					workoutValues[startIdx+14].(string),
+					workoutValues[startIdx+15].(float64),
+					workoutValues[startIdx+16].(string),
+					workoutValues[startIdx+17].(float64),
+					workoutValues[startIdx+18].(string),
+					workoutValues[startIdx+19].(float64),
+					workoutValues[startIdx+20].(string),
+					workoutValues[startIdx+21].(float64),
+					workoutValues[startIdx+22].(string),
+					workoutValues[startIdx+23].(float64),
+					workoutValues[startIdx+24].(string),
+					workoutValues[startIdx+25].(float64),
+					workoutValues[startIdx+26].(string),
+					workoutValues[startIdx+27].(float64),
+					workoutValues[startIdx+28].(string),
+					workoutValues[startIdx+29].(float64),
+					workoutValues[startIdx+30].(string),
+					workoutValues[startIdx+31].(float64),
+					workoutValues[startIdx+32].(float64),
+					workoutValues[startIdx+33-1].(string)))
 			}
 
 			// Execute the batch insert
-			_, err = tx.ExecContext(ctx, query.String(), batchValues...)
+			_, err = tx.ExecContext(ctx, query.String())
 			if err != nil {
 				return fmt.Errorf("failed to insert workouts batch: %w", err)
 			}
@@ -527,25 +560,30 @@ func (store *ClickHouseMetricStore) StoreWorkouts(workouts []request.Workout) er
 				VALUES 
 			`, store.database, store.routesTable))
 
-			// Add placeholders for each row in the batch
+			// Add values for each row in the batch
 			for i := batchStart; i < batchEnd; i++ {
+				startIdx := i * 6
+
+				// Format timestamps
+				workoutStart := routeValues[startIdx+1].(time.Time).Format("2006-01-02 15:04:05")
+				timestamp := routeValues[startIdx+2].(time.Time).Format("2006-01-02 15:04:05")
+
 				if i > batchStart {
 					query.WriteString(", ")
 				}
-				query.WriteString("(?, ?, ?, ?, ?, ?)")
-			}
 
-			// Extract the values for this batch
-			batchValues := make([]interface{}, 0, (batchEnd-batchStart)*6)
-			for i := batchStart; i < batchEnd; i++ {
-				startIdx := i * 6
-				for j := 0; j < 6; j++ {
-					batchValues = append(batchValues, routeValues[startIdx+j])
-				}
+				// Use direct value interpolation to avoid Float64 parsing issues
+				query.WriteString(fmt.Sprintf("('%s', toDateTime('%s'), toDateTime('%s'), %f, %f, %f)",
+					routeValues[startIdx].(string),
+					workoutStart,
+					timestamp,
+					routeValues[startIdx+3].(float64),
+					routeValues[startIdx+4].(float64),
+					routeValues[startIdx+5].(float64)))
 			}
 
 			// Execute the batch insert
-			_, err = tx.ExecContext(ctx, query.String(), batchValues...)
+			_, err = tx.ExecContext(ctx, query.String())
 			if err != nil {
 				return fmt.Errorf("failed to insert route points batch: %w", err)
 			}
@@ -572,25 +610,29 @@ func (store *ClickHouseMetricStore) StoreWorkouts(workouts []request.Workout) er
 				VALUES 
 			`, store.database, store.heartRateDataTable))
 
-			// Add placeholders for each row in the batch
+			// Add values for each row in the batch
 			for i := batchStart; i < batchEnd; i++ {
+				startIdx := i * 5
+
+				// Format timestamps
+				workoutStart := heartRateDataValues[startIdx+1].(time.Time).Format("2006-01-02 15:04:05")
+				timestamp := heartRateDataValues[startIdx+2].(time.Time).Format("2006-01-02 15:04:05")
+
 				if i > batchStart {
 					query.WriteString(", ")
 				}
-				query.WriteString("(?, ?, ?, ?, ?)")
-			}
 
-			// Extract the values for this batch
-			batchValues := make([]interface{}, 0, (batchEnd-batchStart)*5)
-			for i := batchStart; i < batchEnd; i++ {
-				startIdx := i * 5
-				for j := 0; j < 5; j++ {
-					batchValues = append(batchValues, heartRateDataValues[startIdx+j])
-				}
+				// Use direct value interpolation to avoid Float64 parsing issues
+				query.WriteString(fmt.Sprintf("('%s', toDateTime('%s'), toDateTime('%s'), %f, '%s')",
+					heartRateDataValues[startIdx].(string),
+					workoutStart,
+					timestamp,
+					heartRateDataValues[startIdx+3].(float64),
+					heartRateDataValues[startIdx+4].(string)))
 			}
 
 			// Execute the batch insert
-			_, err = tx.ExecContext(ctx, query.String(), batchValues...)
+			_, err = tx.ExecContext(ctx, query.String())
 			if err != nil {
 				return fmt.Errorf("failed to insert heart rate data points batch: %w", err)
 			}
@@ -617,25 +659,29 @@ func (store *ClickHouseMetricStore) StoreWorkouts(workouts []request.Workout) er
 				VALUES 
 			`, store.database, store.heartRateRecoveryTable))
 
-			// Add placeholders for each row in the batch
+			// Add values for each row in the batch
 			for i := batchStart; i < batchEnd; i++ {
+				startIdx := i * 5
+
+				// Format timestamps
+				workoutStart := heartRateRecoveryValues[startIdx+1].(time.Time).Format("2006-01-02 15:04:05")
+				timestamp := heartRateRecoveryValues[startIdx+2].(time.Time).Format("2006-01-02 15:04:05")
+
 				if i > batchStart {
 					query.WriteString(", ")
 				}
-				query.WriteString("(?, ?, ?, ?, ?)")
-			}
 
-			// Extract the values for this batch
-			batchValues := make([]interface{}, 0, (batchEnd-batchStart)*5)
-			for i := batchStart; i < batchEnd; i++ {
-				startIdx := i * 5
-				for j := 0; j < 5; j++ {
-					batchValues = append(batchValues, heartRateRecoveryValues[startIdx+j])
-				}
+				// Use direct value interpolation to avoid Float64 parsing issues
+				query.WriteString(fmt.Sprintf("('%s', toDateTime('%s'), toDateTime('%s'), %f, '%s')",
+					heartRateRecoveryValues[startIdx].(string),
+					workoutStart,
+					timestamp,
+					heartRateRecoveryValues[startIdx+3].(float64),
+					heartRateRecoveryValues[startIdx+4].(string)))
 			}
 
 			// Execute the batch insert
-			_, err = tx.ExecContext(ctx, query.String(), batchValues...)
+			_, err = tx.ExecContext(ctx, query.String())
 			if err != nil {
 				return fmt.Errorf("failed to insert heart rate recovery data points batch: %w", err)
 			}
