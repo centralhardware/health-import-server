@@ -6,6 +6,7 @@ import (
 	"fmt"
 	_ "github.com/ClickHouse/clickhouse-go/v2"
 	"github.com/joeecarter/health-import-server/request"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -514,40 +515,59 @@ func (store *ClickHouseMetricStore) StoreWorkouts(workouts []request.Workout) er
 				}
 
 				// Use direct value interpolation to avoid Float64 parsing issues
+				// Helper function to safely convert to float64
+				safeFloat64 := func(val interface{}) float64 {
+					switch v := val.(type) {
+					case float64:
+						return v
+					case int:
+						return float64(v)
+					case time.Time:
+						return float64(v.Unix())
+					default:
+						// Try to parse as float64
+						str := fmt.Sprintf("%v", v)
+						if f, err := strconv.ParseFloat(str, 64); err == nil {
+							return f
+						}
+						return 0
+					}
+				}
+
 				query.WriteString(fmt.Sprintf("('%s', toDateTime('%s'), toDateTime('%s'), %f, '%s', %f, '%s', %f, '%s', %f, '%s', %f, '%s', %f, '%s', %f, '%s', %f, '%s', %f, '%s', %f, '%s', %f, '%s', %f, '%s', %f, '%s', %f, '%s', %f, %f, '%s')",
 					workoutValues[startIdx].(string),
 					start,
 					end,
-					workoutValues[startIdx+3].(float64),
+					safeFloat64(workoutValues[startIdx+3]),
 					workoutValues[startIdx+4].(string),
-					workoutValues[startIdx+5].(float64),
+					safeFloat64(workoutValues[startIdx+5]),
 					workoutValues[startIdx+6].(string),
-					workoutValues[startIdx+7].(float64),
+					safeFloat64(workoutValues[startIdx+7]),
 					workoutValues[startIdx+8].(string),
-					workoutValues[startIdx+9].(float64),
+					safeFloat64(workoutValues[startIdx+9]),
 					workoutValues[startIdx+10].(string),
-					workoutValues[startIdx+11].(float64),
+					safeFloat64(workoutValues[startIdx+11]),
 					workoutValues[startIdx+12].(string),
-					workoutValues[startIdx+13].(float64),
+					safeFloat64(workoutValues[startIdx+13]),
 					workoutValues[startIdx+14].(string),
-					workoutValues[startIdx+15].(float64),
+					safeFloat64(workoutValues[startIdx+15]),
 					workoutValues[startIdx+16].(string),
-					workoutValues[startIdx+17].(float64),
+					safeFloat64(workoutValues[startIdx+17]),
 					workoutValues[startIdx+18].(string),
-					workoutValues[startIdx+19].(float64),
+					safeFloat64(workoutValues[startIdx+19]),
 					workoutValues[startIdx+20].(string),
-					workoutValues[startIdx+21].(float64),
+					safeFloat64(workoutValues[startIdx+21]),
 					workoutValues[startIdx+22].(string),
-					workoutValues[startIdx+23].(float64),
+					safeFloat64(workoutValues[startIdx+23]),
 					workoutValues[startIdx+24].(string),
-					workoutValues[startIdx+25].(float64),
+					safeFloat64(workoutValues[startIdx+25]),
 					workoutValues[startIdx+26].(string),
-					workoutValues[startIdx+27].(float64),
+					safeFloat64(workoutValues[startIdx+27]),
 					workoutValues[startIdx+28].(string),
-					workoutValues[startIdx+29].(float64),
+					safeFloat64(workoutValues[startIdx+29]),
 					workoutValues[startIdx+30].(string),
-					workoutValues[startIdx+31].(float64),
-					workoutValues[startIdx+32].(float64),
+					safeFloat64(workoutValues[startIdx+31]),
+					safeFloat64(workoutValues[startIdx+32]),
 					fmt.Sprintf("'%v'", workoutValues[startIdx+32])))
 			}
 
@@ -611,13 +631,32 @@ func (store *ClickHouseMetricStore) StoreWorkouts(workouts []request.Workout) er
 				}
 
 				// Use direct value interpolation to avoid Float64 parsing issues
+				// Helper function to safely convert to float64
+				safeFloat64 := func(val interface{}) float64 {
+					switch v := val.(type) {
+					case float64:
+						return v
+					case int:
+						return float64(v)
+					case time.Time:
+						return float64(v.Unix())
+					default:
+						// Try to parse as float64
+						str := fmt.Sprintf("%v", v)
+						if f, err := strconv.ParseFloat(str, 64); err == nil {
+							return f
+						}
+						return 0
+					}
+				}
+
 				query.WriteString(fmt.Sprintf("('%s', toDateTime('%s'), toDateTime('%s'), %f, %f, %f)",
 					routeValues[startIdx].(string),
 					workoutStart,
 					timestamp,
-					routeValues[startIdx+3].(float64),
-					routeValues[startIdx+4].(float64),
-					routeValues[startIdx+5].(float64)))
+					safeFloat64(routeValues[startIdx+3]),
+					safeFloat64(routeValues[startIdx+4]),
+					safeFloat64(routeValues[startIdx+5])))
 			}
 
 			// Execute the batch insert
@@ -680,11 +719,30 @@ func (store *ClickHouseMetricStore) StoreWorkouts(workouts []request.Workout) er
 				}
 
 				// Use direct value interpolation to avoid Float64 parsing issues
+				// Helper function to safely convert to float64
+				safeFloat64 := func(val interface{}) float64 {
+					switch v := val.(type) {
+					case float64:
+						return v
+					case int:
+						return float64(v)
+					case time.Time:
+						return float64(v.Unix())
+					default:
+						// Try to parse as float64
+						str := fmt.Sprintf("%v", v)
+						if f, err := strconv.ParseFloat(str, 64); err == nil {
+							return f
+						}
+						return 0
+					}
+				}
+
 				query.WriteString(fmt.Sprintf("('%s', toDateTime('%s'), toDateTime('%s'), %f, '%s')",
 					heartRateDataValues[startIdx].(string),
 					workoutStart,
 					timestamp,
-					heartRateDataValues[startIdx+3].(float64),
+					safeFloat64(heartRateDataValues[startIdx+3]),
 					heartRateDataValues[startIdx+4].(string)))
 			}
 
@@ -748,11 +806,30 @@ func (store *ClickHouseMetricStore) StoreWorkouts(workouts []request.Workout) er
 				}
 
 				// Use direct value interpolation to avoid Float64 parsing issues
+				// Helper function to safely convert to float64
+				safeFloat64 := func(val interface{}) float64 {
+					switch v := val.(type) {
+					case float64:
+						return v
+					case int:
+						return float64(v)
+					case time.Time:
+						return float64(v.Unix())
+					default:
+						// Try to parse as float64
+						str := fmt.Sprintf("%v", v)
+						if f, err := strconv.ParseFloat(str, 64); err == nil {
+							return f
+						}
+						return 0
+					}
+				}
+
 				query.WriteString(fmt.Sprintf("('%s', toDateTime('%s'), toDateTime('%s'), %f, '%s')",
 					heartRateRecoveryValues[startIdx].(string),
 					workoutStart,
 					timestamp,
-					heartRateRecoveryValues[startIdx+3].(float64),
+					safeFloat64(heartRateRecoveryValues[startIdx+3]),
 					heartRateRecoveryValues[startIdx+4].(string)))
 			}
 
