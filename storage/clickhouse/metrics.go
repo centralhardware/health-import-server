@@ -350,6 +350,9 @@ func (store *ClickHouseMetricStore) StoreWorkouts(workouts []request.Workout) er
 
 		// Add workout data to the batch
 		// Ensure all float64 values are properly formatted for ClickHouse
+		// Use a temporary variable for step count to ensure proper Float64 formatting
+		stepCountQty := float64(workout.StepCount.Qty)
+
 		workoutValues = append(workoutValues,
 			workout.Name,
 			startTime,
@@ -364,7 +367,7 @@ func (store *ClickHouseMetricStore) StoreWorkouts(workouts []request.Workout) er
 			workout.MaxHeartRate.Units,
 			float64(workout.Distance.Qty),
 			workout.Distance.Units,
-			float64(workout.StepCount.Qty*1.0), // Ensure proper Float64 formatting
+			stepCountQty,
 			workout.StepCount.Units,
 			float64(workout.StepCadence.Qty),
 			workout.StepCadence.Units,
