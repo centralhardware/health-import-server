@@ -364,7 +364,7 @@ func (store *ClickHouseMetricStore) StoreWorkouts(workouts []request.Workout) er
 			workout.MaxHeartRate.Units,
 			float64(workout.Distance.Qty),
 			workout.Distance.Units,
-			float64(workout.StepCount.Qty),
+			float64(workout.StepCount.Qty*1.0), // Ensure proper Float64 formatting
 			workout.StepCount.Units,
 			float64(workout.StepCadence.Qty),
 			workout.StepCadence.Units,
