@@ -529,7 +529,7 @@ func (store *ClickHouseMetricStore) StoreWorkouts(workouts []request.Workout) er
 					workoutValues[startIdx+30].(string),
 					workoutValues[startIdx+31].(float64),
 					workoutValues[startIdx+32].(float64),
-					workoutValues[startIdx+33-1].(string)))
+					fmt.Sprintf("'%v'", workoutValues[startIdx+32])))
 			}
 
 			// Execute the batch insert
