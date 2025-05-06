@@ -304,27 +304,19 @@ func (store *ClickHouseMetricStore) StoreWorkouts(workouts []request.Workout) er
 		VALUES (?, ?, ?, ?, ?)
 	`, store.database, store.routesTable)
 
-	// Prepare statement for inserting heart rate data
-	heartRateDataStmt, err := tx.PrepareContext(ctx, fmt.Sprintf(`
+	// We'll use direct ExecContext calls for heart rate data instead of preparing a statement
+	heartRateDataQuery := fmt.Sprintf(`
 		INSERT INTO %s.%s
 		(workout_id, timestamp, qty, units)
 		VALUES (?, ?, ?, ?)
-	`, store.database, store.heartRateDataTable))
-	if err != nil {
-		return fmt.Errorf("failed to prepare heart rate data statement: %w", err)
-	}
-	defer heartRateDataStmt.Close()
+	`, store.database, store.heartRateDataTable)
 
-	// Prepare statement for inserting heart rate recovery data
-	heartRateRecoveryStmt, err := tx.PrepareContext(ctx, fmt.Sprintf(`
+	// We'll use direct ExecContext calls for heart rate recovery data instead of preparing a statement
+	heartRateRecoveryQuery := fmt.Sprintf(`
 		INSERT INTO %s.%s
 		(workout_id, timestamp, qty, units)
 		VALUES (?, ?, ?, ?)
-	`, store.database, store.heartRateRecoveryTable))
-	if err != nil {
-		return fmt.Errorf("failed to prepare heart rate recovery statement: %w", err)
-	}
-	defer heartRateRecoveryStmt.Close()
+	`, store.database, store.heartRateRecoveryTable)
 
 	// Insert workouts
 	for _, workout := range workouts {
@@ -417,7 +409,7 @@ func (store *ClickHouseMetricStore) StoreWorkouts(workouts []request.Workout) er
 				heartRateTimestamp = startTime
 			}
 
-			_, err = heartRateDataStmt.ExecContext(ctx,
+			_, err = tx.ExecContext(ctx, heartRateDataQuery,
 				workoutID,
 				heartRateTimestamp,
 				heartRatePoint.Qty,
@@ -438,7 +430,7 @@ func (store *ClickHouseMetricStore) StoreWorkouts(workouts []request.Workout) er
 				heartRateRecoveryTimestamp = startTime
 			}
 
-			_, err = heartRateRecoveryStmt.ExecContext(ctx,
+			_, err = tx.ExecContext(ctx, heartRateRecoveryQuery,
 				workoutID,
 				heartRateRecoveryTimestamp,
 				heartRateRecoveryPoint.Qty,
