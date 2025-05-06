@@ -3,6 +3,7 @@ package clickhouse
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	_ "github.com/ClickHouse/clickhouse-go/v2"
 	"github.com/joeecarter/health-import-server/request"
@@ -181,6 +182,28 @@ func (store *ClickHouseMetricStore) createTablesIfNotExist() error {
 			distance_units String DEFAULT '',
 			step_count_qty Float64 DEFAULT 0,
 			step_count_units String DEFAULT '',
+			step_cadence_qty Float64 DEFAULT 0,
+			step_cadence_units String DEFAULT '',
+			speed_qty Float64 DEFAULT 0,
+			speed_units String DEFAULT '',
+			swim_cadence_qty Float64 DEFAULT 0,
+			swim_cadence_units String DEFAULT '',
+			intensity_qty Float64 DEFAULT 0,
+			intensity_units String DEFAULT '',
+			humidity_qty Float64 DEFAULT 0,
+			humidity_units String DEFAULT '',
+			total_swimming_stroke_count_qty Float64 DEFAULT 0,
+			total_swimming_stroke_count_units String DEFAULT '',
+			flights_climbed_qty Float64 DEFAULT 0,
+			flights_climbed_units String DEFAULT '',
+			temperature_qty Float64 DEFAULT 0,
+			temperature_units String DEFAULT '',
+			elevation_ascent Float64 DEFAULT 0,
+			elevation_descent Float64 DEFAULT 0,
+			elevation_units String DEFAULT '',
+			route_json String DEFAULT '',
+			heart_rate_data_json String DEFAULT '',
+			heart_rate_recovery_json String DEFAULT '',
 			PRIMARY KEY (start, name)
 		) ENGINE = MergeTree()
 	`, store.database, store.workoutsTable))
@@ -208,8 +231,14 @@ func (store *ClickHouseMetricStore) StoreWorkouts(workouts []request.Workout) er
 		INSERT INTO %s.%s 
 		(name, start, end, total_energy_qty, total_energy_units, active_energy_qty, active_energy_units, 
 		avg_heart_rate_qty, avg_heart_rate_units, max_heart_rate_qty, max_heart_rate_units, 
-		distance_qty, distance_units, step_count_qty, step_count_units) 
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		distance_qty, distance_units, step_count_qty, step_count_units,
+		step_cadence_qty, step_cadence_units, speed_qty, speed_units,
+		swim_cadence_qty, swim_cadence_units, intensity_qty, intensity_units,
+		humidity_qty, humidity_units, total_swimming_stroke_count_qty, total_swimming_stroke_count_units,
+		flights_climbed_qty, flights_climbed_units, temperature_qty, temperature_units,
+		elevation_ascent, elevation_descent, elevation_units,
+		route_json, heart_rate_data_json, heart_rate_recovery_json) 
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`, store.database, store.workoutsTable))
 	if err != nil {
 		return fmt.Errorf("failed to prepare statement: %w", err)
@@ -231,6 +260,22 @@ func (store *ClickHouseMetricStore) StoreWorkouts(workouts []request.Workout) er
 			endTime = time.Now()
 		}
 
+		// Convert complex types to JSON
+		routeJSON, err := json.Marshal(workout.Route)
+		if err != nil {
+			return fmt.Errorf("failed to marshal route data: %w", err)
+		}
+
+		heartRateDataJSON, err := json.Marshal(workout.HeartRateData)
+		if err != nil {
+			return fmt.Errorf("failed to marshal heart rate data: %w", err)
+		}
+
+		heartRateRecoveryJSON, err := json.Marshal(workout.HeartRateRecovery)
+		if err != nil {
+			return fmt.Errorf("failed to marshal heart rate recovery data: %w", err)
+		}
+
 		_, err = stmt.ExecContext(ctx,
 			workout.Name,
 			startTime,
@@ -247,6 +292,28 @@ func (store *ClickHouseMetricStore) StoreWorkouts(workouts []request.Workout) er
 			workout.Distance.Units,
 			workout.StepCount.Qty,
 			workout.StepCount.Units,
+			workout.StepCadence.Qty,
+			workout.StepCadence.Units,
+			workout.Speed.Qty,
+			workout.Speed.Units,
+			workout.SwimCadence.Qty,
+			workout.SwimCadence.Units,
+			workout.Intensity.Qty,
+			workout.Intensity.Units,
+			workout.Humidity.Qty,
+			workout.Humidity.Units,
+			workout.TotalSwimmingStrokeCount.Qty,
+			workout.TotalSwimmingStrokeCount.Units,
+			workout.FlightsClimbed.Qty,
+			workout.FlightsClimbed.Units,
+			workout.Temperature.Qty,
+			workout.Temperature.Units,
+			workout.Elevation.Ascent,
+			workout.Elevation.Descent,
+			workout.Elevation.Units,
+			string(routeJSON),
+			string(heartRateDataJSON),
+			string(heartRateRecoveryJSON),
 		)
 		if err != nil {
 			return fmt.Errorf("failed to insert workout: %w", err)
