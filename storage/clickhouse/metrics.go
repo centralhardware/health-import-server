@@ -133,8 +133,14 @@ func (store *ClickHouseMetricStore) Store(metrics []request.Metric) error {
 }
 
 func (store *ClickHouseMetricStore) createTablesIfNotExist() error {
+	// Set compatibility setting for AUTO_INCREMENT
+	_, err := store.db.Exec(`SET compatibility_ignore_auto_increment_in_create_table = 1`)
+	if err != nil {
+		return fmt.Errorf("failed to set compatibility setting: %w", err)
+	}
+
 	// Create database if not exists
-	_, err := store.db.Exec(fmt.Sprintf(`
+	_, err = store.db.Exec(fmt.Sprintf(`
 		CREATE DATABASE IF NOT EXISTS %s
 	`, store.database))
 	if err != nil {
