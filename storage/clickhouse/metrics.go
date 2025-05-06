@@ -6,8 +6,6 @@ import (
 	"fmt"
 	_ "github.com/ClickHouse/clickhouse-go/v2"
 	"github.com/joeecarter/health-import-server/request"
-	"strconv"
-	"strings"
 	"time"
 )
 
@@ -68,16 +66,8 @@ func (store *ClickHouseMetricStore) Store(metrics []request.Metric) error {
 	}
 
 	ctx := context.Background()
-	tx, err := store.db.BeginTx(ctx, nil)
-	if err != nil {
-		return fmt.Errorf("failed to begin transaction: %w", err)
-	}
-	defer tx.Rollback()
 
-	// Collect all metric data
-	var metricValues []interface{}
-
-	// Process all metrics and collect data for insertion
+	// Process all metrics and insert them one by one
 	for _, metric := range metrics {
 		metricType := request.LookupMetricType(metric.Name)
 		for _, sample := range metric.Samples {
@@ -109,8 +99,17 @@ func (store *ClickHouseMetricStore) Store(metrics []request.Metric) error {
 				inBedSource = s.InBedSource
 			}
 
-			// Add metric data to the batch
-			metricValues = append(metricValues,
+			// Build the query for a single metric
+			query := fmt.Sprintf(`
+				INSERT INTO %s.%s 
+				(timestamp, metric_name, metric_unit, metric_type, qty, max, min, avg, asleep, in_bed, sleep_source, in_bed_source) 
+				VALUES 
+				(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+				SETTINGS async_insert=true
+			`, store.database, store.metricsTable)
+
+			// Execute the insert for a single metric
+			_, err := store.db.ExecContext(ctx, query,
 				timestamp,
 				metric.Name,
 				metric.Unit,
@@ -124,56 +123,10 @@ func (store *ClickHouseMetricStore) Store(metrics []request.Metric) error {
 				sleepSource,
 				inBedSource,
 			)
-		}
-	}
-
-	// Insert metrics in batch
-	if len(metricValues) > 0 {
-		// Prepare the batch insert query
-		batchSize := 1000 // Adjust based on your needs
-		numMetrics := len(metricValues) / 12
-
-		for batchStart := 0; batchStart < numMetrics; batchStart += batchSize {
-			batchEnd := batchStart + batchSize
-			if batchEnd > numMetrics {
-				batchEnd = numMetrics
-			}
-
-			// Build the query with multiple value sets
-			var query strings.Builder
-			query.WriteString(fmt.Sprintf(`
-				INSERT INTO %s.%s 
-				(timestamp, metric_name, metric_unit, metric_type, qty, max, min, avg, asleep, in_bed, sleep_source, in_bed_source) 
-				VALUES 
-			`, store.database, store.metricsTable))
-
-			// Add placeholders for each row in the batch
-			for i := batchStart; i < batchEnd; i++ {
-				if i > batchStart {
-					query.WriteString(", ")
-				}
-				query.WriteString("(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
-			}
-
-			// Extract the values for this batch
-			batchValues := make([]interface{}, 0, (batchEnd-batchStart)*12)
-			for i := batchStart; i < batchEnd; i++ {
-				startIdx := i * 12
-				for j := 0; j < 12; j++ {
-					batchValues = append(batchValues, metricValues[startIdx+j])
-				}
-			}
-
-			// Execute the batch insert
-			_, err = tx.ExecContext(ctx, query.String(), batchValues...)
 			if err != nil {
-				return fmt.Errorf("failed to insert metrics batch: %w", err)
+				return fmt.Errorf("failed to insert metric: %w", err)
 			}
 		}
-	}
-
-	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("failed to commit transaction: %w", err)
 	}
 
 	return nil
@@ -316,25 +269,8 @@ func (store *ClickHouseMetricStore) StoreWorkouts(workouts []request.Workout) er
 	}
 
 	ctx := context.Background()
-	tx, err := store.db.BeginTx(ctx, nil)
-	if err != nil {
-		return fmt.Errorf("failed to begin transaction: %w", err)
-	}
-	defer tx.Rollback()
 
-	// Collect all workout data
-	var workoutValues []interface{}
-
-	// Collect all route data
-	var routeValues []interface{}
-
-	// Collect all heart rate data
-	var heartRateDataValues []interface{}
-
-	// Collect all heart rate recovery data
-	var heartRateRecoveryValues []interface{}
-
-	// Process all workouts and collect data for batch insertion
+	// Process all workouts and insert them one by one
 	for _, workout := range workouts {
 		// Handle nil timestamps
 		var startTime, endTime time.Time
@@ -349,15 +285,28 @@ func (store *ClickHouseMetricStore) StoreWorkouts(workouts []request.Workout) er
 			endTime = time.Now()
 		}
 
-		// Add workout data to the batch
-		// Ensure all float64 values are properly formatted for ClickHouse
-		// Use a temporary variable for step count to ensure proper Float64 formatting
-		stepCountQty := float64(workout.StepCount.Qty)
+		// Format timestamps
+		start := startTime.Format("2006-01-02 15:04:05")
+		end := endTime.Format("2006-01-02 15:04:05")
 
-		workoutValues = append(workoutValues,
+		// Insert workout
+		workoutQuery := fmt.Sprintf(`
+			INSERT INTO %s.%s 
+			(name, start, end, total_energy_qty, total_energy_units, active_energy_qty, active_energy_units, 
+			avg_heart_rate_qty, avg_heart_rate_units, max_heart_rate_qty, max_heart_rate_units, 
+			distance_qty, distance_units, step_count_qty, step_count_units,
+			step_cadence_qty, step_cadence_units, speed_qty, speed_units,
+			swim_cadence_qty, swim_cadence_units, intensity_qty, intensity_units,
+			humidity_qty, humidity_units, total_swimming_stroke_count_qty, total_swimming_stroke_count_units,
+			flights_climbed_qty, flights_climbed_units, temperature_qty, temperature_units,
+			elevation_ascent, elevation_descent, elevation_units) 
+			VALUES 
+			('%s', toDateTime('%s'), toDateTime('%s'), %f, '%s', %f, '%s', %f, '%s', %f, '%s', %f, '%s', %f, '%s', %f, '%s', %f, '%s', %f, '%s', %f, '%s', %f, '%s', %f, '%s', %f, '%s', %f, '%s', %f, %f, '%s')
+			SETTINGS async_insert=true
+		`, store.database, store.workoutsTable,
 			workout.Name,
-			startTime,
-			endTime,
+			start,
+			end,
 			float64(workout.TotalEnergy.Qty),
 			workout.TotalEnergy.Units,
 			float64(workout.ActiveEnergy.Qty),
@@ -368,7 +317,7 @@ func (store *ClickHouseMetricStore) StoreWorkouts(workouts []request.Workout) er
 			workout.MaxHeartRate.Units,
 			float64(workout.Distance.Qty),
 			workout.Distance.Units,
-			stepCountQty,
+			float64(workout.StepCount.Qty),
 			workout.StepCount.Units,
 			float64(workout.StepCadence.Qty),
 			workout.StepCadence.Units,
@@ -388,8 +337,13 @@ func (store *ClickHouseMetricStore) StoreWorkouts(workouts []request.Workout) er
 			workout.Temperature.Units,
 			float64(workout.Elevation.Ascent),
 			float64(workout.Elevation.Descent),
-			workout.Elevation.Units,
-		)
+			workout.Elevation.Units)
+
+		// Execute the workout insert
+		_, err := store.db.ExecContext(ctx, workoutQuery)
+		if err != nil {
+			return fmt.Errorf("failed to insert workout: %w", err)
+		}
 
 		// Process route data
 		for _, routePoint := range workout.Route {
@@ -401,16 +355,29 @@ func (store *ClickHouseMetricStore) StoreWorkouts(workouts []request.Workout) er
 				routeTimestamp = startTime
 			}
 
-			// Add route data to the batch
-			// Ensure all float64 values are properly formatted for ClickHouse
-			routeValues = append(routeValues,
+			// Format timestamp
+			timestamp := routeTimestamp.Format("2006-01-02 15:04:05")
+
+			// Insert route point
+			routeQuery := fmt.Sprintf(`
+				INSERT INTO %s.%s
+				(workout_name, workout_start, timestamp, lat, lon, altitude)
+				VALUES 
+				('%s', toDateTime('%s'), toDateTime('%s'), %f, %f, %f)
+				SETTINGS async_insert=true
+			`, store.database, store.routesTable,
 				workout.Name,
-				startTime,
-				routeTimestamp,
+				start,
+				timestamp,
 				float64(routePoint.Lat),
 				float64(routePoint.Lon),
-				float64(routePoint.Altitude),
-			)
+				float64(routePoint.Altitude))
+
+			// Execute the route point insert
+			_, err := store.db.ExecContext(ctx, routeQuery)
+			if err != nil {
+				return fmt.Errorf("failed to insert route point: %w", err)
+			}
 		}
 
 		// Process heart rate data
@@ -423,15 +390,28 @@ func (store *ClickHouseMetricStore) StoreWorkouts(workouts []request.Workout) er
 				heartRateTimestamp = startTime
 			}
 
-			// Add heart rate data to the batch
-			// Ensure all float64 values are properly formatted for ClickHouse
-			heartRateDataValues = append(heartRateDataValues,
+			// Format timestamp
+			timestamp := heartRateTimestamp.Format("2006-01-02 15:04:05")
+
+			// Insert heart rate data point
+			heartRateQuery := fmt.Sprintf(`
+				INSERT INTO %s.%s
+				(workout_name, workout_start, timestamp, qty, units)
+				VALUES 
+				('%s', toDateTime('%s'), toDateTime('%s'), %f, '%s')
+				SETTINGS async_insert=true
+			`, store.database, store.heartRateDataTable,
 				workout.Name,
-				startTime,
-				heartRateTimestamp,
+				start,
+				timestamp,
 				float64(heartRatePoint.Qty),
-				heartRatePoint.Units,
-			)
+				heartRatePoint.Units)
+
+			// Execute the heart rate data point insert
+			_, err := store.db.ExecContext(ctx, heartRateQuery)
+			if err != nil {
+				return fmt.Errorf("failed to insert heart rate data point: %w", err)
+			}
 		}
 
 		// Process heart rate recovery data
@@ -444,490 +424,29 @@ func (store *ClickHouseMetricStore) StoreWorkouts(workouts []request.Workout) er
 				heartRateRecoveryTimestamp = startTime
 			}
 
-			// Add heart rate recovery data to the batch
-			// Ensure all float64 values are properly formatted for ClickHouse
-			heartRateRecoveryValues = append(heartRateRecoveryValues,
+			// Format timestamp
+			timestamp := heartRateRecoveryTimestamp.Format("2006-01-02 15:04:05")
+
+			// Insert heart rate recovery data point
+			heartRateRecoveryQuery := fmt.Sprintf(`
+				INSERT INTO %s.%s
+				(workout_name, workout_start, timestamp, qty, units)
+				VALUES 
+				('%s', toDateTime('%s'), toDateTime('%s'), %f, '%s')
+				SETTINGS async_insert=true
+			`, store.database, store.heartRateRecoveryTable,
 				workout.Name,
-				startTime,
-				heartRateRecoveryTimestamp,
+				start,
+				timestamp,
 				float64(heartRateRecoveryPoint.Qty),
-				heartRateRecoveryPoint.Units,
-			)
-		}
-	}
+				heartRateRecoveryPoint.Units)
 
-	// Insert workouts in batch
-	if len(workoutValues) > 0 {
-		// Prepare the batch insert query
-		batchSize := 100 // Adjust based on your needs
-		numWorkouts := len(workoutValues) / 33
-
-		for batchStart := 0; batchStart < numWorkouts; batchStart += batchSize {
-			batchEnd := batchStart + batchSize
-			if batchEnd > numWorkouts {
-				batchEnd = numWorkouts
-			}
-
-			// Build the query with multiple value sets
-			var query strings.Builder
-			query.WriteString(fmt.Sprintf(`
-				INSERT INTO %s.%s 
-				(name, start, end, total_energy_qty, total_energy_units, active_energy_qty, active_energy_units, 
-				avg_heart_rate_qty, avg_heart_rate_units, max_heart_rate_qty, max_heart_rate_units, 
-				distance_qty, distance_units, step_count_qty, step_count_units,
-				step_cadence_qty, step_cadence_units, speed_qty, speed_units,
-				swim_cadence_qty, swim_cadence_units, intensity_qty, intensity_units,
-				humidity_qty, humidity_units, total_swimming_stroke_count_qty, total_swimming_stroke_count_units,
-				flights_climbed_qty, flights_climbed_units, temperature_qty, temperature_units,
-				elevation_ascent, elevation_descent, elevation_units) 
-				VALUES 
-			`, store.database, store.workoutsTable))
-
-			// Add values for each row in the batch
-			for i := batchStart; i < batchEnd; i++ {
-				startIdx := i * 33
-
-				// Format timestamps
-				var start, end string
-
-				// Handle start time - could be string or time.Time
-				switch v := workoutValues[startIdx+1].(type) {
-				case time.Time:
-					start = v.Format("2006-01-02 15:04:05")
-				case string:
-					// Try to parse as time if it's a string
-					if t, err := time.Parse(time.RFC3339, v); err == nil {
-						start = t.Format("2006-01-02 15:04:05")
-					} else if _, err := time.Parse("2006-01-02 15:04:05", v); err == nil {
-						start = v
-					} else {
-						// If it's not a valid time string, use a default
-						start = time.Now().Format("2006-01-02 15:04:05")
-					}
-				default:
-					// For any other type, use current time
-					start = time.Now().Format("2006-01-02 15:04:05")
-				}
-
-				// Handle end time - could be string or time.Time
-				switch v := workoutValues[startIdx+2].(type) {
-				case time.Time:
-					end = v.Format("2006-01-02 15:04:05")
-				case string:
-					// Try to parse as time if it's a string
-					if t, err := time.Parse(time.RFC3339, v); err == nil {
-						end = t.Format("2006-01-02 15:04:05")
-					} else if _, err := time.Parse("2006-01-02 15:04:05", v); err == nil {
-						end = v
-					} else {
-						// If it's not a valid time string, use a default
-						end = time.Now().Format("2006-01-02 15:04:05")
-					}
-				default:
-					// For any other type, use current time
-					end = time.Now().Format("2006-01-02 15:04:05")
-				}
-
-				if i > batchStart {
-					query.WriteString(", ")
-				}
-
-				// Use direct value interpolation to avoid Float64 parsing issues
-				// Helper function to safely convert to float64
-				safeFloat64 := func(val interface{}) float64 {
-					switch v := val.(type) {
-					case float64:
-						return v
-					case int:
-						return float64(v)
-					case time.Time:
-						return float64(v.Unix())
-					default:
-						// Try to parse as float64
-						str := fmt.Sprintf("%v", v)
-						if f, err := strconv.ParseFloat(str, 64); err == nil {
-							return f
-						}
-						return 0
-					}
-				}
-
-				// Helper function to safely convert to string
-				safeString := func(val interface{}) string {
-					switch v := val.(type) {
-					case string:
-						return v
-					case float64:
-						return fmt.Sprintf("%v", v)
-					case int:
-						return fmt.Sprintf("%v", v)
-					case time.Time:
-						return v.Format("2006-01-02 15:04:05")
-					default:
-						return fmt.Sprintf("%v", v)
-					}
-				}
-
-				// Ensure proper formatting for ClickHouse
-				workoutName := safeString(workoutValues[startIdx])
-
-				query.WriteString(fmt.Sprintf("('%s', toDateTime('%s'), toDateTime('%s'), %f, '%s', %f, '%s', %f, '%s', %f, '%s', %f, '%s', %f, '%s', %f, '%s', %f, '%s', %f, '%s', %f, '%s', %f, '%s', %f, '%s', %f, '%s', %f, '%s', %f, %f, '%s')",
-					workoutName,
-					start,
-					end,
-					safeFloat64(workoutValues[startIdx+3]),
-					safeString(workoutValues[startIdx+4]),
-					safeFloat64(workoutValues[startIdx+5]),
-					safeString(workoutValues[startIdx+6]),
-					safeFloat64(workoutValues[startIdx+7]),
-					safeString(workoutValues[startIdx+8]),
-					safeFloat64(workoutValues[startIdx+9]),
-					safeString(workoutValues[startIdx+10]),
-					safeFloat64(workoutValues[startIdx+11]),
-					safeString(workoutValues[startIdx+12]),
-					safeFloat64(workoutValues[startIdx+13]),
-					safeString(workoutValues[startIdx+14]),
-					safeFloat64(workoutValues[startIdx+15]),
-					safeString(workoutValues[startIdx+16]),
-					safeFloat64(workoutValues[startIdx+17]),
-					safeString(workoutValues[startIdx+18]),
-					safeFloat64(workoutValues[startIdx+19]),
-					safeString(workoutValues[startIdx+20]),
-					safeFloat64(workoutValues[startIdx+21]),
-					safeString(workoutValues[startIdx+22]),
-					safeFloat64(workoutValues[startIdx+23]),
-					safeString(workoutValues[startIdx+24]),
-					safeFloat64(workoutValues[startIdx+25]),
-					safeString(workoutValues[startIdx+26]),
-					safeFloat64(workoutValues[startIdx+27]),
-					safeString(workoutValues[startIdx+28]),
-					safeFloat64(workoutValues[startIdx+29]),
-					safeString(workoutValues[startIdx+30]),
-					safeFloat64(workoutValues[startIdx+31]),
-					safeFloat64(workoutValues[startIdx+32]),
-					safeString(workoutValues[startIdx+32])))
-			}
-
-			// Execute the batch insert
-			_, err = tx.ExecContext(ctx, query.String())
+			// Execute the heart rate recovery data point insert
+			_, err := store.db.ExecContext(ctx, heartRateRecoveryQuery)
 			if err != nil {
-				return fmt.Errorf("failed to insert workouts batch: %w", err)
+				return fmt.Errorf("failed to insert heart rate recovery data point: %w", err)
 			}
 		}
-	}
-
-	// Insert route data in batch
-	if len(routeValues) > 0 {
-		// Prepare the batch insert query
-		batchSize := 1000 // Adjust based on your needs
-		numRoutePoints := len(routeValues) / 6
-
-		for batchStart := 0; batchStart < numRoutePoints; batchStart += batchSize {
-			batchEnd := batchStart + batchSize
-			if batchEnd > numRoutePoints {
-				batchEnd = numRoutePoints
-			}
-
-			// Build the query with multiple value sets
-			var query strings.Builder
-			query.WriteString(fmt.Sprintf(`
-				INSERT INTO %s.%s
-				(workout_name, workout_start, timestamp, lat, lon, altitude)
-				VALUES 
-			`, store.database, store.routesTable))
-
-			// Add values for each row in the batch
-			for i := batchStart; i < batchEnd; i++ {
-				startIdx := i * 6
-
-				// Format timestamps
-				var workoutStart, timestamp string
-
-				// Handle workout start time - could be string or time.Time
-				switch v := routeValues[startIdx+1].(type) {
-				case time.Time:
-					workoutStart = v.Format("2006-01-02 15:04:05")
-				case string:
-					workoutStart = v
-				default:
-					workoutStart = fmt.Sprintf("%v", v)
-				}
-
-				// Handle timestamp - could be string or time.Time
-				switch v := routeValues[startIdx+2].(type) {
-				case time.Time:
-					timestamp = v.Format("2006-01-02 15:04:05")
-				case string:
-					timestamp = v
-				default:
-					timestamp = fmt.Sprintf("%v", v)
-				}
-
-				if i > batchStart {
-					query.WriteString(", ")
-				}
-
-				// Use direct value interpolation to avoid Float64 parsing issues
-				// Helper function to safely convert to float64
-				safeFloat64 := func(val interface{}) float64 {
-					switch v := val.(type) {
-					case float64:
-						return v
-					case int:
-						return float64(v)
-					case time.Time:
-						return float64(v.Unix())
-					default:
-						// Try to parse as float64
-						str := fmt.Sprintf("%v", v)
-						if f, err := strconv.ParseFloat(str, 64); err == nil {
-							return f
-						}
-						return 0
-					}
-				}
-
-				// Helper function to safely convert to string
-				safeString := func(val interface{}) string {
-					switch v := val.(type) {
-					case string:
-						return v
-					case float64:
-						return fmt.Sprintf("%v", v)
-					case int:
-						return fmt.Sprintf("%v", v)
-					case time.Time:
-						return v.Format("2006-01-02 15:04:05")
-					default:
-						return fmt.Sprintf("%v", v)
-					}
-				}
-
-				query.WriteString(fmt.Sprintf("('%s', toDateTime('%s'), toDateTime('%s'), %f, %f, %f)",
-					safeString(routeValues[startIdx]),
-					workoutStart,
-					timestamp,
-					safeFloat64(routeValues[startIdx+3]),
-					safeFloat64(routeValues[startIdx+4]),
-					safeFloat64(routeValues[startIdx+5])))
-			}
-
-			// Execute the batch insert
-			_, err = tx.ExecContext(ctx, query.String())
-			if err != nil {
-				return fmt.Errorf("failed to insert route points batch: %w", err)
-			}
-		}
-	}
-
-	// Insert heart rate data in batch
-	if len(heartRateDataValues) > 0 {
-		// Prepare the batch insert query
-		batchSize := 1000 // Adjust based on your needs
-		numHeartRatePoints := len(heartRateDataValues) / 5
-
-		for batchStart := 0; batchStart < numHeartRatePoints; batchStart += batchSize {
-			batchEnd := batchStart + batchSize
-			if batchEnd > numHeartRatePoints {
-				batchEnd = numHeartRatePoints
-			}
-
-			// Build the query with multiple value sets
-			var query strings.Builder
-			query.WriteString(fmt.Sprintf(`
-				INSERT INTO %s.%s
-				(workout_name, workout_start, timestamp, qty, units)
-				VALUES 
-			`, store.database, store.heartRateDataTable))
-
-			// Add values for each row in the batch
-			for i := batchStart; i < batchEnd; i++ {
-				startIdx := i * 5
-
-				// Format timestamps
-				var workoutStart, timestamp string
-
-				// Handle workout start time - could be string or time.Time
-				switch v := heartRateDataValues[startIdx+1].(type) {
-				case time.Time:
-					workoutStart = v.Format("2006-01-02 15:04:05")
-				case string:
-					workoutStart = v
-				default:
-					workoutStart = fmt.Sprintf("%v", v)
-				}
-
-				// Handle timestamp - could be string or time.Time
-				switch v := heartRateDataValues[startIdx+2].(type) {
-				case time.Time:
-					timestamp = v.Format("2006-01-02 15:04:05")
-				case string:
-					timestamp = v
-				default:
-					timestamp = fmt.Sprintf("%v", v)
-				}
-
-				if i > batchStart {
-					query.WriteString(", ")
-				}
-
-				// Use direct value interpolation to avoid Float64 parsing issues
-				// Helper function to safely convert to float64
-				safeFloat64 := func(val interface{}) float64 {
-					switch v := val.(type) {
-					case float64:
-						return v
-					case int:
-						return float64(v)
-					case time.Time:
-						return float64(v.Unix())
-					default:
-						// Try to parse as float64
-						str := fmt.Sprintf("%v", v)
-						if f, err := strconv.ParseFloat(str, 64); err == nil {
-							return f
-						}
-						return 0
-					}
-				}
-
-				// Helper function to safely convert to string
-				safeString := func(val interface{}) string {
-					switch v := val.(type) {
-					case string:
-						return v
-					case float64:
-						return fmt.Sprintf("%v", v)
-					case int:
-						return fmt.Sprintf("%v", v)
-					case time.Time:
-						return v.Format("2006-01-02 15:04:05")
-					default:
-						return fmt.Sprintf("%v", v)
-					}
-				}
-
-				query.WriteString(fmt.Sprintf("('%s', toDateTime('%s'), toDateTime('%s'), %f, '%s')",
-					safeString(heartRateDataValues[startIdx]),
-					workoutStart,
-					timestamp,
-					safeFloat64(heartRateDataValues[startIdx+3]),
-					safeString(heartRateDataValues[startIdx+4])))
-			}
-
-			// Execute the batch insert
-			_, err = tx.ExecContext(ctx, query.String())
-			if err != nil {
-				return fmt.Errorf("failed to insert heart rate data points batch: %w", err)
-			}
-		}
-	}
-
-	// Insert heart rate recovery data in batch
-	if len(heartRateRecoveryValues) > 0 {
-		// Prepare the batch insert query
-		batchSize := 1000 // Adjust based on your needs
-		numHeartRateRecoveryPoints := len(heartRateRecoveryValues) / 5
-
-		for batchStart := 0; batchStart < numHeartRateRecoveryPoints; batchStart += batchSize {
-			batchEnd := batchStart + batchSize
-			if batchEnd > numHeartRateRecoveryPoints {
-				batchEnd = numHeartRateRecoveryPoints
-			}
-
-			// Build the query with multiple value sets
-			var query strings.Builder
-			query.WriteString(fmt.Sprintf(`
-				INSERT INTO %s.%s
-				(workout_name, workout_start, timestamp, qty, units)
-				VALUES 
-			`, store.database, store.heartRateRecoveryTable))
-
-			// Add values for each row in the batch
-			for i := batchStart; i < batchEnd; i++ {
-				startIdx := i * 5
-
-				// Format timestamps
-				var workoutStart, timestamp string
-
-				// Handle workout start time - could be string or time.Time
-				switch v := heartRateRecoveryValues[startIdx+1].(type) {
-				case time.Time:
-					workoutStart = v.Format("2006-01-02 15:04:05")
-				case string:
-					workoutStart = v
-				default:
-					workoutStart = fmt.Sprintf("%v", v)
-				}
-
-				// Handle timestamp - could be string or time.Time
-				switch v := heartRateRecoveryValues[startIdx+2].(type) {
-				case time.Time:
-					timestamp = v.Format("2006-01-02 15:04:05")
-				case string:
-					timestamp = v
-				default:
-					timestamp = fmt.Sprintf("%v", v)
-				}
-
-				if i > batchStart {
-					query.WriteString(", ")
-				}
-
-				// Use direct value interpolation to avoid Float64 parsing issues
-				// Helper function to safely convert to float64
-				safeFloat64 := func(val interface{}) float64 {
-					switch v := val.(type) {
-					case float64:
-						return v
-					case int:
-						return float64(v)
-					case time.Time:
-						return float64(v.Unix())
-					default:
-						// Try to parse as float64
-						str := fmt.Sprintf("%v", v)
-						if f, err := strconv.ParseFloat(str, 64); err == nil {
-							return f
-						}
-						return 0
-					}
-				}
-
-				// Helper function to safely convert to string
-				safeString := func(val interface{}) string {
-					switch v := val.(type) {
-					case string:
-						return v
-					case float64:
-						return fmt.Sprintf("%v", v)
-					case int:
-						return fmt.Sprintf("%v", v)
-					case time.Time:
-						return v.Format("2006-01-02 15:04:05")
-					default:
-						return fmt.Sprintf("%v", v)
-					}
-				}
-
-				query.WriteString(fmt.Sprintf("('%s', toDateTime('%s'), toDateTime('%s'), %f, '%s')",
-					safeString(heartRateRecoveryValues[startIdx]),
-					workoutStart,
-					timestamp,
-					safeFloat64(heartRateRecoveryValues[startIdx+3]),
-					safeString(heartRateRecoveryValues[startIdx+4])))
-			}
-
-			// Execute the batch insert
-			_, err = tx.ExecContext(ctx, query.String())
-			if err != nil {
-				return fmt.Errorf("failed to insert heart rate recovery data points batch: %w", err)
-			}
-		}
-	}
-
-	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("failed to commit transaction: %w", err)
 	}
 
 	return nil
