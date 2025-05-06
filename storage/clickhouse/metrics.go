@@ -297,16 +297,12 @@ func (store *ClickHouseMetricStore) StoreWorkouts(workouts []request.Workout) er
 	}
 	defer stmt.Close()
 
-	// Prepare statement for inserting route data
-	routeStmt, err := tx.PrepareContext(ctx, fmt.Sprintf(`
+	// We'll use direct ExecContext calls for route data instead of preparing a statement
+	routeQuery := fmt.Sprintf(`
 		INSERT INTO %s.%s
 		(workout_id, timestamp, lat, lon, altitude)
 		VALUES (?, ?, ?, ?, ?)
-	`, store.database, store.routesTable))
-	if err != nil {
-		return fmt.Errorf("failed to prepare route statement: %w", err)
-	}
-	defer routeStmt.Close()
+	`, store.database, store.routesTable)
 
 	// Prepare statement for inserting heart rate data
 	heartRateDataStmt, err := tx.PrepareContext(ctx, fmt.Sprintf(`
@@ -399,7 +395,7 @@ func (store *ClickHouseMetricStore) StoreWorkouts(workouts []request.Workout) er
 				routeTimestamp = startTime
 			}
 
-			_, err = routeStmt.ExecContext(ctx,
+			_, err = tx.ExecContext(ctx, routeQuery,
 				workoutID,
 				routeTimestamp,
 				routePoint.Lat,
