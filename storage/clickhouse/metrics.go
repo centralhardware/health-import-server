@@ -3,7 +3,6 @@ package clickhouse
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"fmt"
 	_ "github.com/ClickHouse/clickhouse-go/v2"
 	"github.com/joeecarter/health-import-server/request"
@@ -167,6 +166,7 @@ func (store *ClickHouseMetricStore) createTablesIfNotExist() error {
 	// Create workouts table if not exists
 	_, err = store.db.Exec(fmt.Sprintf(`
 		CREATE TABLE IF NOT EXISTS %s.%s (
+			id UInt64 NOT NULL AUTO_INCREMENT,
 			name String,
 			start DateTime,
 			end DateTime,
@@ -201,14 +201,54 @@ func (store *ClickHouseMetricStore) createTablesIfNotExist() error {
 			elevation_ascent Float64 DEFAULT 0,
 			elevation_descent Float64 DEFAULT 0,
 			elevation_units String DEFAULT '',
-			route_json String DEFAULT '',
-			heart_rate_data_json String DEFAULT '',
-			heart_rate_recovery_json String DEFAULT '',
-			PRIMARY KEY (start, name)
+			PRIMARY KEY (id)
 		) ENGINE = MergeTree()
 	`, store.database, store.workoutsTable))
 	if err != nil {
 		return fmt.Errorf("failed to create workouts table: %w", err)
+	}
+
+	// Create routes table if not exists
+	_, err = store.db.Exec(fmt.Sprintf(`
+		CREATE TABLE IF NOT EXISTS %s.workout_routes (
+			workout_id UInt64,
+			timestamp DateTime,
+			lat Float64,
+			lon Float64,
+			altitude Float64,
+			PRIMARY KEY (workout_id, timestamp)
+		) ENGINE = MergeTree()
+	`, store.database))
+	if err != nil {
+		return fmt.Errorf("failed to create routes table: %w", err)
+	}
+
+	// Create heart rate data table if not exists
+	_, err = store.db.Exec(fmt.Sprintf(`
+		CREATE TABLE IF NOT EXISTS %s.workout_heart_rate_data (
+			workout_id UInt64,
+			timestamp DateTime,
+			qty Float64,
+			units String,
+			PRIMARY KEY (workout_id, timestamp)
+		) ENGINE = MergeTree()
+	`, store.database))
+	if err != nil {
+		return fmt.Errorf("failed to create heart rate data table: %w", err)
+	}
+
+	// Create heart rate recovery table if not exists
+	_, err = store.db.Exec(fmt.Sprintf(`
+		CREATE TABLE IF NOT EXISTS %s.workout_heart_rate_recovery (
+			workout_id UInt64,
+			timestamp DateTime,
+			qty Float64,
+			units String,
+			PRIMARY KEY (workout_id, timestamp)
+		) ENGINE = MergeTree()
+	`, store.database))
+	if err != nil {
+		return fmt.Errorf("failed to create heart rate recovery table: %w", err)
 	}
 
 	return nil
@@ -236,14 +276,47 @@ func (store *ClickHouseMetricStore) StoreWorkouts(workouts []request.Workout) er
 		swim_cadence_qty, swim_cadence_units, intensity_qty, intensity_units,
 		humidity_qty, humidity_units, total_swimming_stroke_count_qty, total_swimming_stroke_count_units,
 		flights_climbed_qty, flights_climbed_units, temperature_qty, temperature_units,
-		elevation_ascent, elevation_descent, elevation_units,
-		route_json, heart_rate_data_json, heart_rate_recovery_json) 
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		elevation_ascent, elevation_descent, elevation_units) 
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		RETURNING id
 	`, store.database, store.workoutsTable))
 	if err != nil {
 		return fmt.Errorf("failed to prepare statement: %w", err)
 	}
 	defer stmt.Close()
+
+	// Prepare statement for inserting route data
+	routeStmt, err := tx.PrepareContext(ctx, fmt.Sprintf(`
+		INSERT INTO %s.workout_routes
+		(workout_id, timestamp, lat, lon, altitude)
+		VALUES (?, ?, ?, ?, ?)
+	`, store.database))
+	if err != nil {
+		return fmt.Errorf("failed to prepare route statement: %w", err)
+	}
+	defer routeStmt.Close()
+
+	// Prepare statement for inserting heart rate data
+	heartRateDataStmt, err := tx.PrepareContext(ctx, fmt.Sprintf(`
+		INSERT INTO %s.workout_heart_rate_data
+		(workout_id, timestamp, qty, units)
+		VALUES (?, ?, ?, ?)
+	`, store.database))
+	if err != nil {
+		return fmt.Errorf("failed to prepare heart rate data statement: %w", err)
+	}
+	defer heartRateDataStmt.Close()
+
+	// Prepare statement for inserting heart rate recovery data
+	heartRateRecoveryStmt, err := tx.PrepareContext(ctx, fmt.Sprintf(`
+		INSERT INTO %s.workout_heart_rate_recovery
+		(workout_id, timestamp, qty, units)
+		VALUES (?, ?, ?, ?)
+	`, store.database))
+	if err != nil {
+		return fmt.Errorf("failed to prepare heart rate recovery statement: %w", err)
+	}
+	defer heartRateRecoveryStmt.Close()
 
 	// Insert workouts
 	for _, workout := range workouts {
@@ -260,23 +333,11 @@ func (store *ClickHouseMetricStore) StoreWorkouts(workouts []request.Workout) er
 			endTime = time.Now()
 		}
 
-		// Convert complex types to JSON
-		routeJSON, err := json.Marshal(workout.Route)
-		if err != nil {
-			return fmt.Errorf("failed to marshal route data: %w", err)
-		}
+		// No need to convert heart rate data to JSON anymore as we'll store it in separate tables
 
-		heartRateDataJSON, err := json.Marshal(workout.HeartRateData)
-		if err != nil {
-			return fmt.Errorf("failed to marshal heart rate data: %w", err)
-		}
-
-		heartRateRecoveryJSON, err := json.Marshal(workout.HeartRateRecovery)
-		if err != nil {
-			return fmt.Errorf("failed to marshal heart rate recovery data: %w", err)
-		}
-
-		_, err = stmt.ExecContext(ctx,
+		// Insert workout data and get the ID
+		var workoutID string
+		err = stmt.QueryRowContext(ctx,
 			workout.Name,
 			startTime,
 			endTime,
@@ -311,12 +372,73 @@ func (store *ClickHouseMetricStore) StoreWorkouts(workouts []request.Workout) er
 			workout.Elevation.Ascent,
 			workout.Elevation.Descent,
 			workout.Elevation.Units,
-			string(routeJSON),
-			string(heartRateDataJSON),
-			string(heartRateRecoveryJSON),
-		)
+		).Scan(&workoutID)
 		if err != nil {
 			return fmt.Errorf("failed to insert workout: %w", err)
+		}
+
+		// Insert route data
+		for _, routePoint := range workout.Route {
+			var routeTimestamp time.Time
+			if routePoint.Timestamp != nil {
+				routeTimestamp = routePoint.Timestamp.ToTime()
+			} else {
+				// Use workout start time if timestamp is missing
+				routeTimestamp = startTime
+			}
+
+			_, err = routeStmt.ExecContext(ctx,
+				workoutID,
+				routeTimestamp,
+				routePoint.Lat,
+				routePoint.Lon,
+				routePoint.Altitude,
+			)
+			if err != nil {
+				return fmt.Errorf("failed to insert route point: %w", err)
+			}
+		}
+
+		// Insert heart rate data
+		for _, heartRatePoint := range workout.HeartRateData {
+			var heartRateTimestamp time.Time
+			if heartRatePoint.Date != nil {
+				heartRateTimestamp = heartRatePoint.Date.ToTime()
+			} else {
+				// Use workout start time if timestamp is missing
+				heartRateTimestamp = startTime
+			}
+
+			_, err = heartRateDataStmt.ExecContext(ctx,
+				workoutID,
+				heartRateTimestamp,
+				heartRatePoint.Qty,
+				heartRatePoint.Units,
+			)
+			if err != nil {
+				return fmt.Errorf("failed to insert heart rate data point: %w", err)
+			}
+		}
+
+		// Insert heart rate recovery data
+		for _, heartRateRecoveryPoint := range workout.HeartRateRecovery {
+			var heartRateRecoveryTimestamp time.Time
+			if heartRateRecoveryPoint.Date != nil {
+				heartRateRecoveryTimestamp = heartRateRecoveryPoint.Date.ToTime()
+			} else {
+				// Use workout start time if timestamp is missing
+				heartRateRecoveryTimestamp = startTime
+			}
+
+			_, err = heartRateRecoveryStmt.ExecContext(ctx,
+				workoutID,
+				heartRateRecoveryTimestamp,
+				heartRateRecoveryPoint.Qty,
+				heartRateRecoveryPoint.Units,
+			)
+			if err != nil {
+				return fmt.Errorf("failed to insert heart rate recovery data point: %w", err)
+			}
 		}
 	}
 
