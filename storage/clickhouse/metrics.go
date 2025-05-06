@@ -18,10 +18,13 @@ type ClickHouseConfig struct {
 }
 
 type ClickHouseMetricStore struct {
-	db            *sql.DB
-	database      string
-	metricsTable  string
-	workoutsTable string
+	db                     *sql.DB
+	database               string
+	metricsTable           string
+	workoutsTable          string
+	routesTable            string
+	heartRateDataTable     string
+	heartRateRecoveryTable string
 }
 
 func NewClickHouseMetricStore(config ClickHouseConfig) (*ClickHouseMetricStore, error) {
@@ -35,10 +38,13 @@ func NewClickHouseMetricStore(config ClickHouseConfig) (*ClickHouseMetricStore, 
 	}
 
 	store := &ClickHouseMetricStore{
-		db:            db,
-		database:      config.Database,
-		metricsTable:  config.MetricsTable,
-		workoutsTable: config.WorkoutsTable,
+		db:                     db,
+		database:               config.Database,
+		metricsTable:           config.MetricsTable,
+		workoutsTable:          config.WorkoutsTable,
+		routesTable:            "workout_routes",
+		heartRateDataTable:     "workout_heart_rate_data",
+		heartRateRecoveryTable: "workout_heart_rate_recovery",
 	}
 
 	if config.CreateTables {
@@ -216,7 +222,7 @@ func (store *ClickHouseMetricStore) createTablesIfNotExist() error {
 
 	// Create routes table if not exists
 	_, err = store.db.Exec(fmt.Sprintf(`
-		CREATE TABLE IF NOT EXISTS %s.workout_routes (
+		CREATE TABLE IF NOT EXISTS %s.%s (
 			workout_id UInt64,
 			timestamp DateTime,
 			lat Float64,
@@ -224,35 +230,35 @@ func (store *ClickHouseMetricStore) createTablesIfNotExist() error {
 			altitude Float64,
 			PRIMARY KEY (workout_id, timestamp)
 		) ENGINE = MergeTree()
-	`, store.database))
+	`, store.database, store.routesTable))
 	if err != nil {
 		return fmt.Errorf("failed to create routes table: %w", err)
 	}
 
 	// Create heart rate data table if not exists
 	_, err = store.db.Exec(fmt.Sprintf(`
-		CREATE TABLE IF NOT EXISTS %s.workout_heart_rate_data (
+		CREATE TABLE IF NOT EXISTS %s.%s (
 			workout_id UInt64,
 			timestamp DateTime,
 			qty Float64,
 			units String,
 			PRIMARY KEY (workout_id, timestamp)
 		) ENGINE = MergeTree()
-	`, store.database))
+	`, store.database, store.heartRateDataTable))
 	if err != nil {
 		return fmt.Errorf("failed to create heart rate data table: %w", err)
 	}
 
 	// Create heart rate recovery table if not exists
 	_, err = store.db.Exec(fmt.Sprintf(`
-		CREATE TABLE IF NOT EXISTS %s.workout_heart_rate_recovery (
+		CREATE TABLE IF NOT EXISTS %s.%s (
 			workout_id UInt64,
 			timestamp DateTime,
 			qty Float64,
 			units String,
 			PRIMARY KEY (workout_id, timestamp)
 		) ENGINE = MergeTree()
-	`, store.database))
+	`, store.database, store.heartRateRecoveryTable))
 	if err != nil {
 		return fmt.Errorf("failed to create heart rate recovery table: %w", err)
 	}
@@ -293,10 +299,10 @@ func (store *ClickHouseMetricStore) StoreWorkouts(workouts []request.Workout) er
 
 	// Prepare statement for inserting route data
 	routeStmt, err := tx.PrepareContext(ctx, fmt.Sprintf(`
-		INSERT INTO %s.workout_routes
+		INSERT INTO %s.%s
 		(workout_id, timestamp, lat, lon, altitude)
 		VALUES (?, ?, ?, ?, ?)
-	`, store.database))
+	`, store.database, store.routesTable))
 	if err != nil {
 		return fmt.Errorf("failed to prepare route statement: %w", err)
 	}
@@ -304,10 +310,10 @@ func (store *ClickHouseMetricStore) StoreWorkouts(workouts []request.Workout) er
 
 	// Prepare statement for inserting heart rate data
 	heartRateDataStmt, err := tx.PrepareContext(ctx, fmt.Sprintf(`
-		INSERT INTO %s.workout_heart_rate_data
+		INSERT INTO %s.%s
 		(workout_id, timestamp, qty, units)
 		VALUES (?, ?, ?, ?)
-	`, store.database))
+	`, store.database, store.heartRateDataTable))
 	if err != nil {
 		return fmt.Errorf("failed to prepare heart rate data statement: %w", err)
 	}
@@ -315,10 +321,10 @@ func (store *ClickHouseMetricStore) StoreWorkouts(workouts []request.Workout) er
 
 	// Prepare statement for inserting heart rate recovery data
 	heartRateRecoveryStmt, err := tx.PrepareContext(ctx, fmt.Sprintf(`
-		INSERT INTO %s.workout_heart_rate_recovery
+		INSERT INTO %s.%s
 		(workout_id, timestamp, qty, units)
 		VALUES (?, ?, ?, ?)
-	`, store.database))
+	`, store.database, store.heartRateRecoveryTable))
 	if err != nil {
 		return fmt.Errorf("failed to prepare heart rate recovery statement: %w", err)
 	}
