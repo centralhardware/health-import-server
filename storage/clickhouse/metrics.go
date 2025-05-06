@@ -6,6 +6,7 @@ import (
 	"fmt"
 	_ "github.com/ClickHouse/clickhouse-go/v2"
 	"github.com/joeecarter/health-import-server/request"
+	"strings"
 	"time"
 )
 
@@ -61,6 +62,10 @@ func (store *ClickHouseMetricStore) Name() string {
 }
 
 func (store *ClickHouseMetricStore) Store(metrics []request.Metric) error {
+	if len(metrics) == 0 {
+		return nil
+	}
+
 	ctx := context.Background()
 	tx, err := store.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -68,18 +73,11 @@ func (store *ClickHouseMetricStore) Store(metrics []request.Metric) error {
 	}
 	defer tx.Rollback()
 
-	// Prepare statement for inserting metrics
-	stmt, err := tx.PrepareContext(ctx, fmt.Sprintf(`
-		INSERT INTO %s.%s 
-		(timestamp, metric_name, metric_unit, metric_type, qty, max, min, avg, asleep, in_bed, sleep_source, in_bed_source) 
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-	`, store.database, store.metricsTable))
-	if err != nil {
-		return fmt.Errorf("failed to prepare statement: %w", err)
-	}
-	defer stmt.Close()
+	// Collect all metric data
+	var metricValues []interface{}
+	var metricPlaceholders []string
 
-	// Insert metrics
+	// Process all metrics and collect data for batch insertion
 	for _, metric := range metrics {
 		metricType := request.LookupMetricType(metric.Name)
 		for _, sample := range metric.Samples {
@@ -111,7 +109,8 @@ func (store *ClickHouseMetricStore) Store(metrics []request.Metric) error {
 				inBedSource = s.InBedSource
 			}
 
-			_, err = stmt.ExecContext(ctx,
+			// Add metric data to the batch
+			metricValues = append(metricValues,
 				timestamp,
 				metric.Name,
 				metric.Unit,
@@ -125,9 +124,21 @@ func (store *ClickHouseMetricStore) Store(metrics []request.Metric) error {
 				sleepSource,
 				inBedSource,
 			)
-			if err != nil {
-				return fmt.Errorf("failed to insert metric: %w", err)
-			}
+			metricPlaceholders = append(metricPlaceholders, "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+		}
+	}
+
+	// Insert metrics in batch
+	if len(metricPlaceholders) > 0 {
+		metricQuery := fmt.Sprintf(`
+			INSERT INTO %s.%s 
+			(timestamp, metric_name, metric_unit, metric_type, qty, max, min, avg, asleep, in_bed, sleep_source, in_bed_source) 
+			VALUES %s
+		`, store.database, store.metricsTable, joinPlaceholders(metricPlaceholders))
+
+		_, err = tx.ExecContext(ctx, metricQuery, metricValues...)
+		if err != nil {
+			return fmt.Errorf("failed to insert metrics batch: %w", err)
 		}
 	}
 
@@ -281,46 +292,23 @@ func (store *ClickHouseMetricStore) StoreWorkouts(workouts []request.Workout) er
 	}
 	defer tx.Rollback()
 
-	// Prepare statement for inserting workouts
-	stmt, err := tx.PrepareContext(ctx, fmt.Sprintf(`
-		INSERT INTO %s.%s 
-		(name, start, end, total_energy_qty, total_energy_units, active_energy_qty, active_energy_units, 
-		avg_heart_rate_qty, avg_heart_rate_units, max_heart_rate_qty, max_heart_rate_units, 
-		distance_qty, distance_units, step_count_qty, step_count_units,
-		step_cadence_qty, step_cadence_units, speed_qty, speed_units,
-		swim_cadence_qty, swim_cadence_units, intensity_qty, intensity_units,
-		humidity_qty, humidity_units, total_swimming_stroke_count_qty, total_swimming_stroke_count_units,
-		flights_climbed_qty, flights_climbed_units, temperature_qty, temperature_units,
-		elevation_ascent, elevation_descent, elevation_units) 
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-	`, store.database, store.workoutsTable))
-	if err != nil {
-		return fmt.Errorf("failed to prepare statement: %w", err)
-	}
-	defer stmt.Close()
+	// Collect all workout data
+	var workoutValues []interface{}
+	var workoutPlaceholders []string
 
-	// We'll use direct ExecContext calls for route data instead of preparing a statement
-	routeQuery := fmt.Sprintf(`
-		INSERT INTO %s.%s
-		(workout_name, workout_start, timestamp, lat, lon, altitude)
-		VALUES (?, ?, ?, ?, ?, ?)
-	`, store.database, store.routesTable)
+	// Collect all route data
+	var routeValues []interface{}
+	var routePlaceholders []string
 
-	// We'll use direct ExecContext calls for heart rate data instead of preparing a statement
-	heartRateDataQuery := fmt.Sprintf(`
-		INSERT INTO %s.%s
-		(workout_name, workout_start, timestamp, qty, units)
-		VALUES (?, ?, ?, ?, ?)
-	`, store.database, store.heartRateDataTable)
+	// Collect all heart rate data
+	var heartRateDataValues []interface{}
+	var heartRateDataPlaceholders []string
 
-	// We'll use direct ExecContext calls for heart rate recovery data instead of preparing a statement
-	heartRateRecoveryQuery := fmt.Sprintf(`
-		INSERT INTO %s.%s
-		(workout_name, workout_start, timestamp, qty, units)
-		VALUES (?, ?, ?, ?, ?)
-	`, store.database, store.heartRateRecoveryTable)
+	// Collect all heart rate recovery data
+	var heartRateRecoveryValues []interface{}
+	var heartRateRecoveryPlaceholders []string
 
-	// Insert workouts
+	// Process all workouts and collect data for batch insertion
 	for _, workout := range workouts {
 		// Handle nil timestamps
 		var startTime, endTime time.Time
@@ -335,10 +323,8 @@ func (store *ClickHouseMetricStore) StoreWorkouts(workouts []request.Workout) er
 			endTime = time.Now()
 		}
 
-		// No need to convert heart rate data to JSON anymore as we'll store it in separate tables
-
-		// Insert workout data
-		_, err = stmt.ExecContext(ctx,
+		// Add workout data to the batch
+		workoutValues = append(workoutValues,
 			workout.Name,
 			startTime,
 			endTime,
@@ -374,11 +360,9 @@ func (store *ClickHouseMetricStore) StoreWorkouts(workouts []request.Workout) er
 			workout.Elevation.Descent,
 			workout.Elevation.Units,
 		)
-		if err != nil {
-			return fmt.Errorf("failed to insert workout: %w", err)
-		}
+		workoutPlaceholders = append(workoutPlaceholders, "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
 
-		// Insert route data
+		// Process route data
 		for _, routePoint := range workout.Route {
 			var routeTimestamp time.Time
 			if routePoint.Timestamp != nil {
@@ -388,8 +372,8 @@ func (store *ClickHouseMetricStore) StoreWorkouts(workouts []request.Workout) er
 				routeTimestamp = startTime
 			}
 
-			// Use the database connection directly instead of the transaction
-			_, err = store.db.ExecContext(ctx, routeQuery,
+			// Add route data to the batch
+			routeValues = append(routeValues,
 				workout.Name,
 				startTime,
 				routeTimestamp,
@@ -397,12 +381,10 @@ func (store *ClickHouseMetricStore) StoreWorkouts(workouts []request.Workout) er
 				routePoint.Lon,
 				routePoint.Altitude,
 			)
-			if err != nil {
-				return fmt.Errorf("failed to insert route point: %w", err)
-			}
+			routePlaceholders = append(routePlaceholders, "(?, ?, ?, ?, ?, ?)")
 		}
 
-		// Insert heart rate data
+		// Process heart rate data
 		for _, heartRatePoint := range workout.HeartRateData {
 			var heartRateTimestamp time.Time
 			if heartRatePoint.Date != nil {
@@ -412,20 +394,18 @@ func (store *ClickHouseMetricStore) StoreWorkouts(workouts []request.Workout) er
 				heartRateTimestamp = startTime
 			}
 
-			// Use the database connection directly instead of the transaction
-			_, err = store.db.ExecContext(ctx, heartRateDataQuery,
+			// Add heart rate data to the batch
+			heartRateDataValues = append(heartRateDataValues,
 				workout.Name,
 				startTime,
 				heartRateTimestamp,
 				heartRatePoint.Qty,
 				heartRatePoint.Units,
 			)
-			if err != nil {
-				return fmt.Errorf("failed to insert heart rate data point: %w", err)
-			}
+			heartRateDataPlaceholders = append(heartRateDataPlaceholders, "(?, ?, ?, ?, ?)")
 		}
 
-		// Insert heart rate recovery data
+		// Process heart rate recovery data
 		for _, heartRateRecoveryPoint := range workout.HeartRateRecovery {
 			var heartRateRecoveryTimestamp time.Time
 			if heartRateRecoveryPoint.Date != nil {
@@ -435,17 +415,78 @@ func (store *ClickHouseMetricStore) StoreWorkouts(workouts []request.Workout) er
 				heartRateRecoveryTimestamp = startTime
 			}
 
-			// Use the database connection directly instead of the transaction
-			_, err = store.db.ExecContext(ctx, heartRateRecoveryQuery,
+			// Add heart rate recovery data to the batch
+			heartRateRecoveryValues = append(heartRateRecoveryValues,
 				workout.Name,
 				startTime,
 				heartRateRecoveryTimestamp,
 				heartRateRecoveryPoint.Qty,
 				heartRateRecoveryPoint.Units,
 			)
-			if err != nil {
-				return fmt.Errorf("failed to insert heart rate recovery data point: %w", err)
-			}
+			heartRateRecoveryPlaceholders = append(heartRateRecoveryPlaceholders, "(?, ?, ?, ?, ?)")
+		}
+	}
+
+	// Insert workouts in batch
+	if len(workoutPlaceholders) > 0 {
+		workoutQuery := fmt.Sprintf(`
+			INSERT INTO %s.%s 
+			(name, start, end, total_energy_qty, total_energy_units, active_energy_qty, active_energy_units, 
+			avg_heart_rate_qty, avg_heart_rate_units, max_heart_rate_qty, max_heart_rate_units, 
+			distance_qty, distance_units, step_count_qty, step_count_units,
+			step_cadence_qty, step_cadence_units, speed_qty, speed_units,
+			swim_cadence_qty, swim_cadence_units, intensity_qty, intensity_units,
+			humidity_qty, humidity_units, total_swimming_stroke_count_qty, total_swimming_stroke_count_units,
+			flights_climbed_qty, flights_climbed_units, temperature_qty, temperature_units,
+			elevation_ascent, elevation_descent, elevation_units) 
+			VALUES %s
+		`, store.database, store.workoutsTable, joinPlaceholders(workoutPlaceholders))
+
+		_, err = tx.ExecContext(ctx, workoutQuery, workoutValues...)
+		if err != nil {
+			return fmt.Errorf("failed to insert workouts batch: %w", err)
+		}
+	}
+
+	// Insert route data in batch
+	if len(routePlaceholders) > 0 {
+		routeQuery := fmt.Sprintf(`
+			INSERT INTO %s.%s
+			(workout_name, workout_start, timestamp, lat, lon, altitude)
+			VALUES %s
+		`, store.database, store.routesTable, joinPlaceholders(routePlaceholders))
+
+		_, err = tx.ExecContext(ctx, routeQuery, routeValues...)
+		if err != nil {
+			return fmt.Errorf("failed to insert route points batch: %w", err)
+		}
+	}
+
+	// Insert heart rate data in batch
+	if len(heartRateDataPlaceholders) > 0 {
+		heartRateDataQuery := fmt.Sprintf(`
+			INSERT INTO %s.%s
+			(workout_name, workout_start, timestamp, qty, units)
+			VALUES %s
+		`, store.database, store.heartRateDataTable, joinPlaceholders(heartRateDataPlaceholders))
+
+		_, err = tx.ExecContext(ctx, heartRateDataQuery, heartRateDataValues...)
+		if err != nil {
+			return fmt.Errorf("failed to insert heart rate data points batch: %w", err)
+		}
+	}
+
+	// Insert heart rate recovery data in batch
+	if len(heartRateRecoveryPlaceholders) > 0 {
+		heartRateRecoveryQuery := fmt.Sprintf(`
+			INSERT INTO %s.%s
+			(workout_name, workout_start, timestamp, qty, units)
+			VALUES %s
+		`, store.database, store.heartRateRecoveryTable, joinPlaceholders(heartRateRecoveryPlaceholders))
+
+		_, err = tx.ExecContext(ctx, heartRateRecoveryQuery, heartRateRecoveryValues...)
+		if err != nil {
+			return fmt.Errorf("failed to insert heart rate recovery data points batch: %w", err)
 		}
 	}
 
@@ -454,6 +495,11 @@ func (store *ClickHouseMetricStore) StoreWorkouts(workouts []request.Workout) er
 	}
 
 	return nil
+}
+
+// joinPlaceholders joins the placeholders with commas for use in a multi-value INSERT statement
+func joinPlaceholders(placeholders []string) string {
+	return strings.Join(placeholders, ", ")
 }
 
 func (store *ClickHouseMetricStore) Close() error {
