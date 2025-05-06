@@ -6,7 +6,7 @@ import (
 	"fmt"
 	_ "github.com/ClickHouse/clickhouse-go/v2"
 	"github.com/joeecarter/health-import-server/request"
-	
+	"time"
 )
 
 type ClickHouseConfig struct {
