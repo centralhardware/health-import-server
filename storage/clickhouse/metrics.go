@@ -75,9 +75,8 @@ func (store *ClickHouseMetricStore) Store(metrics []request.Metric) error {
 
 	// Collect all metric data
 	var metricValues []interface{}
-	var metricPlaceholders []string
 
-	// Process all metrics and collect data for batch insertion
+	// Process all metrics and collect data for insertion
 	for _, metric := range metrics {
 		metricType := request.LookupMetricType(metric.Name)
 		for _, sample := range metric.Samples {
@@ -124,21 +123,51 @@ func (store *ClickHouseMetricStore) Store(metrics []request.Metric) error {
 				sleepSource,
 				inBedSource,
 			)
-			metricPlaceholders = append(metricPlaceholders, "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
 		}
 	}
 
 	// Insert metrics in batch
-	if len(metricPlaceholders) > 0 {
-		metricQuery := fmt.Sprintf(`
-			INSERT INTO %s.%s 
-			(timestamp, metric_name, metric_unit, metric_type, qty, max, min, avg, asleep, in_bed, sleep_source, in_bed_source) 
-			VALUES %s
-		`, store.database, store.metricsTable, joinPlaceholders(metricPlaceholders))
+	if len(metricValues) > 0 {
+		// Prepare the batch insert query
+		batchSize := 1000 // Adjust based on your needs
+		numMetrics := len(metricValues) / 12
 
-		_, err = tx.ExecContext(ctx, metricQuery, metricValues...)
-		if err != nil {
-			return fmt.Errorf("failed to insert metrics batch: %w", err)
+		for batchStart := 0; batchStart < numMetrics; batchStart += batchSize {
+			batchEnd := batchStart + batchSize
+			if batchEnd > numMetrics {
+				batchEnd = numMetrics
+			}
+
+			// Build the query with multiple value sets
+			var query strings.Builder
+			query.WriteString(fmt.Sprintf(`
+				INSERT INTO %s.%s 
+				(timestamp, metric_name, metric_unit, metric_type, qty, max, min, avg, asleep, in_bed, sleep_source, in_bed_source) 
+				VALUES 
+			`, store.database, store.metricsTable))
+
+			// Add placeholders for each row in the batch
+			for i := batchStart; i < batchEnd; i++ {
+				if i > batchStart {
+					query.WriteString(", ")
+				}
+				query.WriteString("(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+			}
+
+			// Extract the values for this batch
+			batchValues := make([]interface{}, 0, (batchEnd-batchStart)*12)
+			for i := batchStart; i < batchEnd; i++ {
+				startIdx := i * 12
+				for j := 0; j < 12; j++ {
+					batchValues = append(batchValues, metricValues[startIdx+j])
+				}
+			}
+
+			// Execute the batch insert
+			_, err = tx.ExecContext(ctx, query.String(), batchValues...)
+			if err != nil {
+				return fmt.Errorf("failed to insert metrics batch: %w", err)
+			}
 		}
 	}
 
@@ -294,19 +323,15 @@ func (store *ClickHouseMetricStore) StoreWorkouts(workouts []request.Workout) er
 
 	// Collect all workout data
 	var workoutValues []interface{}
-	var workoutPlaceholders []string
 
 	// Collect all route data
 	var routeValues []interface{}
-	var routePlaceholders []string
 
 	// Collect all heart rate data
 	var heartRateDataValues []interface{}
-	var heartRateDataPlaceholders []string
 
 	// Collect all heart rate recovery data
 	var heartRateRecoveryValues []interface{}
-	var heartRateRecoveryPlaceholders []string
 
 	// Process all workouts and collect data for batch insertion
 	for _, workout := range workouts {
@@ -360,7 +385,6 @@ func (store *ClickHouseMetricStore) StoreWorkouts(workouts []request.Workout) er
 			workout.Elevation.Descent,
 			workout.Elevation.Units,
 		)
-		workoutPlaceholders = append(workoutPlaceholders, "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
 
 		// Process route data
 		for _, routePoint := range workout.Route {
@@ -381,7 +405,6 @@ func (store *ClickHouseMetricStore) StoreWorkouts(workouts []request.Workout) er
 				routePoint.Lon,
 				routePoint.Altitude,
 			)
-			routePlaceholders = append(routePlaceholders, "(?, ?, ?, ?, ?, ?)")
 		}
 
 		// Process heart rate data
@@ -402,7 +425,6 @@ func (store *ClickHouseMetricStore) StoreWorkouts(workouts []request.Workout) er
 				heartRatePoint.Qty,
 				heartRatePoint.Units,
 			)
-			heartRateDataPlaceholders = append(heartRateDataPlaceholders, "(?, ?, ?, ?, ?)")
 		}
 
 		// Process heart rate recovery data
@@ -423,70 +445,193 @@ func (store *ClickHouseMetricStore) StoreWorkouts(workouts []request.Workout) er
 				heartRateRecoveryPoint.Qty,
 				heartRateRecoveryPoint.Units,
 			)
-			heartRateRecoveryPlaceholders = append(heartRateRecoveryPlaceholders, "(?, ?, ?, ?, ?)")
 		}
 	}
 
 	// Insert workouts in batch
-	if len(workoutPlaceholders) > 0 {
-		workoutQuery := fmt.Sprintf(`
-			INSERT INTO %s.%s 
-			(name, start, end, total_energy_qty, total_energy_units, active_energy_qty, active_energy_units, 
-			avg_heart_rate_qty, avg_heart_rate_units, max_heart_rate_qty, max_heart_rate_units, 
-			distance_qty, distance_units, step_count_qty, step_count_units,
-			step_cadence_qty, step_cadence_units, speed_qty, speed_units,
-			swim_cadence_qty, swim_cadence_units, intensity_qty, intensity_units,
-			humidity_qty, humidity_units, total_swimming_stroke_count_qty, total_swimming_stroke_count_units,
-			flights_climbed_qty, flights_climbed_units, temperature_qty, temperature_units,
-			elevation_ascent, elevation_descent, elevation_units) 
-			VALUES %s
-		`, store.database, store.workoutsTable, joinPlaceholders(workoutPlaceholders))
+	if len(workoutValues) > 0 {
+		// Prepare the batch insert query
+		batchSize := 100 // Adjust based on your needs
+		numWorkouts := len(workoutValues) / 33
 
-		_, err = tx.ExecContext(ctx, workoutQuery, workoutValues...)
-		if err != nil {
-			return fmt.Errorf("failed to insert workouts batch: %w", err)
+		for batchStart := 0; batchStart < numWorkouts; batchStart += batchSize {
+			batchEnd := batchStart + batchSize
+			if batchEnd > numWorkouts {
+				batchEnd = numWorkouts
+			}
+
+			// Build the query with multiple value sets
+			var query strings.Builder
+			query.WriteString(fmt.Sprintf(`
+				INSERT INTO %s.%s 
+				(name, start, end, total_energy_qty, total_energy_units, active_energy_qty, active_energy_units, 
+				avg_heart_rate_qty, avg_heart_rate_units, max_heart_rate_qty, max_heart_rate_units, 
+				distance_qty, distance_units, step_count_qty, step_count_units,
+				step_cadence_qty, step_cadence_units, speed_qty, speed_units,
+				swim_cadence_qty, swim_cadence_units, intensity_qty, intensity_units,
+				humidity_qty, humidity_units, total_swimming_stroke_count_qty, total_swimming_stroke_count_units,
+				flights_climbed_qty, flights_climbed_units, temperature_qty, temperature_units,
+				elevation_ascent, elevation_descent, elevation_units) 
+				VALUES 
+			`, store.database, store.workoutsTable))
+
+			// Add placeholders for each row in the batch
+			for i := batchStart; i < batchEnd; i++ {
+				if i > batchStart {
+					query.WriteString(", ")
+				}
+				query.WriteString("(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+			}
+
+			// Extract the values for this batch
+			batchValues := make([]interface{}, 0, (batchEnd-batchStart)*33)
+			for i := batchStart; i < batchEnd; i++ {
+				startIdx := i * 33
+				for j := 0; j < 33; j++ {
+					batchValues = append(batchValues, workoutValues[startIdx+j])
+				}
+			}
+
+			// Execute the batch insert
+			_, err = tx.ExecContext(ctx, query.String(), batchValues...)
+			if err != nil {
+				return fmt.Errorf("failed to insert workouts batch: %w", err)
+			}
 		}
 	}
 
 	// Insert route data in batch
-	if len(routePlaceholders) > 0 {
-		routeQuery := fmt.Sprintf(`
-			INSERT INTO %s.%s
-			(workout_name, workout_start, timestamp, lat, lon, altitude)
-			VALUES %s
-		`, store.database, store.routesTable, joinPlaceholders(routePlaceholders))
+	if len(routeValues) > 0 {
+		// Prepare the batch insert query
+		batchSize := 1000 // Adjust based on your needs
+		numRoutePoints := len(routeValues) / 6
 
-		_, err = tx.ExecContext(ctx, routeQuery, routeValues...)
-		if err != nil {
-			return fmt.Errorf("failed to insert route points batch: %w", err)
+		for batchStart := 0; batchStart < numRoutePoints; batchStart += batchSize {
+			batchEnd := batchStart + batchSize
+			if batchEnd > numRoutePoints {
+				batchEnd = numRoutePoints
+			}
+
+			// Build the query with multiple value sets
+			var query strings.Builder
+			query.WriteString(fmt.Sprintf(`
+				INSERT INTO %s.%s
+				(workout_name, workout_start, timestamp, lat, lon, altitude)
+				VALUES 
+			`, store.database, store.routesTable))
+
+			// Add placeholders for each row in the batch
+			for i := batchStart; i < batchEnd; i++ {
+				if i > batchStart {
+					query.WriteString(", ")
+				}
+				query.WriteString("(?, ?, ?, ?, ?, ?)")
+			}
+
+			// Extract the values for this batch
+			batchValues := make([]interface{}, 0, (batchEnd-batchStart)*6)
+			for i := batchStart; i < batchEnd; i++ {
+				startIdx := i * 6
+				for j := 0; j < 6; j++ {
+					batchValues = append(batchValues, routeValues[startIdx+j])
+				}
+			}
+
+			// Execute the batch insert
+			_, err = tx.ExecContext(ctx, query.String(), batchValues...)
+			if err != nil {
+				return fmt.Errorf("failed to insert route points batch: %w", err)
+			}
 		}
 	}
 
 	// Insert heart rate data in batch
-	if len(heartRateDataPlaceholders) > 0 {
-		heartRateDataQuery := fmt.Sprintf(`
-			INSERT INTO %s.%s
-			(workout_name, workout_start, timestamp, qty, units)
-			VALUES %s
-		`, store.database, store.heartRateDataTable, joinPlaceholders(heartRateDataPlaceholders))
+	if len(heartRateDataValues) > 0 {
+		// Prepare the batch insert query
+		batchSize := 1000 // Adjust based on your needs
+		numHeartRatePoints := len(heartRateDataValues) / 5
 
-		_, err = tx.ExecContext(ctx, heartRateDataQuery, heartRateDataValues...)
-		if err != nil {
-			return fmt.Errorf("failed to insert heart rate data points batch: %w", err)
+		for batchStart := 0; batchStart < numHeartRatePoints; batchStart += batchSize {
+			batchEnd := batchStart + batchSize
+			if batchEnd > numHeartRatePoints {
+				batchEnd = numHeartRatePoints
+			}
+
+			// Build the query with multiple value sets
+			var query strings.Builder
+			query.WriteString(fmt.Sprintf(`
+				INSERT INTO %s.%s
+				(workout_name, workout_start, timestamp, qty, units)
+				VALUES 
+			`, store.database, store.heartRateDataTable))
+
+			// Add placeholders for each row in the batch
+			for i := batchStart; i < batchEnd; i++ {
+				if i > batchStart {
+					query.WriteString(", ")
+				}
+				query.WriteString("(?, ?, ?, ?, ?)")
+			}
+
+			// Extract the values for this batch
+			batchValues := make([]interface{}, 0, (batchEnd-batchStart)*5)
+			for i := batchStart; i < batchEnd; i++ {
+				startIdx := i * 5
+				for j := 0; j < 5; j++ {
+					batchValues = append(batchValues, heartRateDataValues[startIdx+j])
+				}
+			}
+
+			// Execute the batch insert
+			_, err = tx.ExecContext(ctx, query.String(), batchValues...)
+			if err != nil {
+				return fmt.Errorf("failed to insert heart rate data points batch: %w", err)
+			}
 		}
 	}
 
 	// Insert heart rate recovery data in batch
-	if len(heartRateRecoveryPlaceholders) > 0 {
-		heartRateRecoveryQuery := fmt.Sprintf(`
-			INSERT INTO %s.%s
-			(workout_name, workout_start, timestamp, qty, units)
-			VALUES %s
-		`, store.database, store.heartRateRecoveryTable, joinPlaceholders(heartRateRecoveryPlaceholders))
+	if len(heartRateRecoveryValues) > 0 {
+		// Prepare the batch insert query
+		batchSize := 1000 // Adjust based on your needs
+		numHeartRateRecoveryPoints := len(heartRateRecoveryValues) / 5
 
-		_, err = tx.ExecContext(ctx, heartRateRecoveryQuery, heartRateRecoveryValues...)
-		if err != nil {
-			return fmt.Errorf("failed to insert heart rate recovery data points batch: %w", err)
+		for batchStart := 0; batchStart < numHeartRateRecoveryPoints; batchStart += batchSize {
+			batchEnd := batchStart + batchSize
+			if batchEnd > numHeartRateRecoveryPoints {
+				batchEnd = numHeartRateRecoveryPoints
+			}
+
+			// Build the query with multiple value sets
+			var query strings.Builder
+			query.WriteString(fmt.Sprintf(`
+				INSERT INTO %s.%s
+				(workout_name, workout_start, timestamp, qty, units)
+				VALUES 
+			`, store.database, store.heartRateRecoveryTable))
+
+			// Add placeholders for each row in the batch
+			for i := batchStart; i < batchEnd; i++ {
+				if i > batchStart {
+					query.WriteString(", ")
+				}
+				query.WriteString("(?, ?, ?, ?, ?)")
+			}
+
+			// Extract the values for this batch
+			batchValues := make([]interface{}, 0, (batchEnd-batchStart)*5)
+			for i := batchStart; i < batchEnd; i++ {
+				startIdx := i * 5
+				for j := 0; j < 5; j++ {
+					batchValues = append(batchValues, heartRateRecoveryValues[startIdx+j])
+				}
+			}
+
+			// Execute the batch insert
+			_, err = tx.ExecContext(ctx, query.String(), batchValues...)
+			if err != nil {
+				return fmt.Errorf("failed to insert heart rate recovery data points batch: %w", err)
+			}
 		}
 	}
 
@@ -495,11 +640,6 @@ func (store *ClickHouseMetricStore) StoreWorkouts(workouts []request.Workout) er
 	}
 
 	return nil
-}
-
-// joinPlaceholders joins the placeholders with commas for use in a multi-value INSERT statement
-func joinPlaceholders(placeholders []string) string {
-	return strings.Join(placeholders, ", ")
 }
 
 func (store *ClickHouseMetricStore) Close() error {
