@@ -14,7 +14,7 @@ type Workout struct {
 	StepCadence              QtyUnit        `json:"stepCadence"`
 	Speed                    QtyUnit        `json:"speed"`
 	SwimCadence              QtyUnit        `json:"swimCadence"`
-	Intensity                QtyUnit        `json:"intensity"`
+	Intensity                QtyUnit        `json:"intesity"`
 	Humidity                 QtyUnit        `json:"humidity"`
 	TotalSwimmingStrokeCount QtyUnit        `json:"totalSwimmingStrokeCount"`
 	FlightsClimbed           QtyUnit        `json:"flightsClimbed"`
@@ -69,7 +69,7 @@ type Elevation struct {
 }
 
 type HeartRateLog struct {
-	Units string    `json:"units"`
-	Date  Timestamp `json:"date"`
-	Qty   float64   `json:"qty"`
+	Units string     `json:"units"`
+	Date  *Timestamp `json:"date"`
+	Qty   float64    `json:"qty"`
 }
