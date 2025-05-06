@@ -349,40 +349,41 @@ func (store *ClickHouseMetricStore) StoreWorkouts(workouts []request.Workout) er
 		}
 
 		// Add workout data to the batch
+		// Ensure all float64 values are properly formatted for ClickHouse
 		workoutValues = append(workoutValues,
 			workout.Name,
 			startTime,
 			endTime,
-			workout.TotalEnergy.Qty,
+			float64(workout.TotalEnergy.Qty),
 			workout.TotalEnergy.Units,
-			workout.ActiveEnergy.Qty,
+			float64(workout.ActiveEnergy.Qty),
 			workout.ActiveEnergy.Units,
-			workout.AvgHeartRate.Qty,
+			float64(workout.AvgHeartRate.Qty),
 			workout.AvgHeartRate.Units,
-			workout.MaxHeartRate.Qty,
+			float64(workout.MaxHeartRate.Qty),
 			workout.MaxHeartRate.Units,
-			workout.Distance.Qty,
+			float64(workout.Distance.Qty),
 			workout.Distance.Units,
-			workout.StepCount.Qty,
+			float64(workout.StepCount.Qty),
 			workout.StepCount.Units,
-			workout.StepCadence.Qty,
+			float64(workout.StepCadence.Qty),
 			workout.StepCadence.Units,
-			workout.Speed.Qty,
+			float64(workout.Speed.Qty),
 			workout.Speed.Units,
-			workout.SwimCadence.Qty,
+			float64(workout.SwimCadence.Qty),
 			workout.SwimCadence.Units,
-			workout.Intensity.Qty,
+			float64(workout.Intensity.Qty),
 			workout.Intensity.Units,
-			workout.Humidity.Qty,
+			float64(workout.Humidity.Qty),
 			workout.Humidity.Units,
-			workout.TotalSwimmingStrokeCount.Qty,
+			float64(workout.TotalSwimmingStrokeCount.Qty),
 			workout.TotalSwimmingStrokeCount.Units,
-			workout.FlightsClimbed.Qty,
+			float64(workout.FlightsClimbed.Qty),
 			workout.FlightsClimbed.Units,
-			workout.Temperature.Qty,
+			float64(workout.Temperature.Qty),
 			workout.Temperature.Units,
-			workout.Elevation.Ascent,
-			workout.Elevation.Descent,
+			float64(workout.Elevation.Ascent),
+			float64(workout.Elevation.Descent),
 			workout.Elevation.Units,
 		)
 
@@ -397,13 +398,14 @@ func (store *ClickHouseMetricStore) StoreWorkouts(workouts []request.Workout) er
 			}
 
 			// Add route data to the batch
+			// Ensure all float64 values are properly formatted for ClickHouse
 			routeValues = append(routeValues,
 				workout.Name,
 				startTime,
 				routeTimestamp,
-				routePoint.Lat,
-				routePoint.Lon,
-				routePoint.Altitude,
+				float64(routePoint.Lat),
+				float64(routePoint.Lon),
+				float64(routePoint.Altitude),
 			)
 		}
 
@@ -418,11 +420,12 @@ func (store *ClickHouseMetricStore) StoreWorkouts(workouts []request.Workout) er
 			}
 
 			// Add heart rate data to the batch
+			// Ensure all float64 values are properly formatted for ClickHouse
 			heartRateDataValues = append(heartRateDataValues,
 				workout.Name,
 				startTime,
 				heartRateTimestamp,
-				heartRatePoint.Qty,
+				float64(heartRatePoint.Qty),
 				heartRatePoint.Units,
 			)
 		}
@@ -438,11 +441,12 @@ func (store *ClickHouseMetricStore) StoreWorkouts(workouts []request.Workout) er
 			}
 
 			// Add heart rate recovery data to the batch
+			// Ensure all float64 values are properly formatted for ClickHouse
 			heartRateRecoveryValues = append(heartRateRecoveryValues,
 				workout.Name,
 				startTime,
 				heartRateRecoveryTimestamp,
-				heartRateRecoveryPoint.Qty,
+				float64(heartRateRecoveryPoint.Qty),
 				heartRateRecoveryPoint.Units,
 			)
 		}
