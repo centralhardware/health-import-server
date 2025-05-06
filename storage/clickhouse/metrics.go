@@ -79,8 +79,8 @@ func (store *ClickHouseMetricStore) Store(metrics []request.Metric) error {
 			if ts := sample.GetTimestamp(); ts != nil {
 				timestamp = ts.ToTime()
 			} else {
-				// Skip samples with nil timestamps
-				continue
+				// Use current timestamp if timestamp is missing
+				timestamp = time.Now()
 			}
 
 			// Default values

@@ -1,5 +1,9 @@
 package request
 
+import (
+	"encoding/json"
+)
+
 type Workout struct {
 	Name                     string         `json:"name"`
 	Start                    *Timestamp     `json:"start"`
@@ -27,6 +31,28 @@ type Workout struct {
 type QtyUnit struct {
 	Units string  `json:"units"`
 	Qty   float64 `json:"qty"`
+}
+
+// UnmarshalJSON implements the json.Unmarshaler interface
+func (q *QtyUnit) UnmarshalJSON(data []byte) error {
+	// Try to unmarshal as a single object first
+	type QtyUnitAlias QtyUnit
+	var singleObj QtyUnitAlias
+
+	if err := json.Unmarshal(data, &singleObj); err == nil {
+		*q = QtyUnit(singleObj)
+		return nil
+	}
+
+	// If that fails, try to unmarshal as an array and use the first element
+	var arrayObj []QtyUnitAlias
+	if err := json.Unmarshal(data, &arrayObj); err == nil && len(arrayObj) > 0 {
+		*q = QtyUnit(arrayObj[0])
+		return nil
+	}
+
+	// If both attempts fail, return the original error
+	return json.Unmarshal(data, (*QtyUnitAlias)(q))
 }
 
 type GPSLog struct {
