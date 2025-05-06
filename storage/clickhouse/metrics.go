@@ -103,9 +103,9 @@ func (store *ClickHouseMetricStore) Store(metrics []request.Metric) error {
 			query := fmt.Sprintf(`
 				INSERT INTO %s.%s 
 				(timestamp, metric_name, metric_unit, metric_type, qty, max, min, avg, asleep, in_bed, sleep_source, in_bed_source) 
+				SETTINGS async_insert=1, wait_for_async_insert=0
 				VALUES 
 				(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-				SETTINGS async_insert=true
 			`, store.database, store.metricsTable)
 
 			// Execute the insert for a single metric
@@ -300,9 +300,9 @@ func (store *ClickHouseMetricStore) StoreWorkouts(workouts []request.Workout) er
 			humidity_qty, humidity_units, total_swimming_stroke_count_qty, total_swimming_stroke_count_units,
 			flights_climbed_qty, flights_climbed_units, temperature_qty, temperature_units,
 			elevation_ascent, elevation_descent, elevation_units) 
+			SETTINGS async_insert=1, wait_for_async_insert=0
 			VALUES 
 			('%s', toDateTime('%s'), toDateTime('%s'), %f, '%s', %f, '%s', %f, '%s', %f, '%s', %f, '%s', %f, '%s', %f, '%s', %f, '%s', %f, '%s', %f, '%s', %f, '%s', %f, '%s', %f, '%s', %f, '%s', %f, %f, '%s')
-			SETTINGS async_insert=true
 		`, store.database, store.workoutsTable,
 			workout.Name,
 			start,
@@ -362,9 +362,9 @@ func (store *ClickHouseMetricStore) StoreWorkouts(workouts []request.Workout) er
 			routeQuery := fmt.Sprintf(`
 				INSERT INTO %s.%s
 				(workout_name, workout_start, timestamp, lat, lon, altitude)
+				SETTINGS async_insert=1, wait_for_async_insert=0
 				VALUES 
 				('%s', toDateTime('%s'), toDateTime('%s'), %f, %f, %f)
-				SETTINGS async_insert=true
 			`, store.database, store.routesTable,
 				workout.Name,
 				start,
@@ -397,9 +397,9 @@ func (store *ClickHouseMetricStore) StoreWorkouts(workouts []request.Workout) er
 			heartRateQuery := fmt.Sprintf(`
 				INSERT INTO %s.%s
 				(workout_name, workout_start, timestamp, qty, units)
+				SETTINGS async_insert=1, wait_for_async_insert=0
 				VALUES 
 				('%s', toDateTime('%s'), toDateTime('%s'), %f, '%s')
-				SETTINGS async_insert=true
 			`, store.database, store.heartRateDataTable,
 				workout.Name,
 				start,
@@ -431,9 +431,9 @@ func (store *ClickHouseMetricStore) StoreWorkouts(workouts []request.Workout) er
 			heartRateRecoveryQuery := fmt.Sprintf(`
 				INSERT INTO %s.%s
 				(workout_name, workout_start, timestamp, qty, units)
+				SETTINGS async_insert=1, wait_for_async_insert=0
 				VALUES 
 				('%s', toDateTime('%s'), toDateTime('%s'), %f, '%s')
-				SETTINGS async_insert=true
 			`, store.database, store.heartRateRecoveryTable,
 				workout.Name,
 				start,
