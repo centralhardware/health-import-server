@@ -223,12 +223,13 @@ func (store *ClickHouseMetricStore) createTablesIfNotExist() error {
 	// Create routes table if not exists
 	_, err = store.db.Exec(fmt.Sprintf(`
 		CREATE TABLE IF NOT EXISTS %s.%s (
-			workout_id UInt64,
+			workout_name String,
+			workout_start DateTime,
 			timestamp DateTime,
 			lat Float64,
 			lon Float64,
 			altitude Float64,
-			PRIMARY KEY (workout_id, timestamp)
+			PRIMARY KEY (workout_name, workout_start, timestamp)
 		) ENGINE = MergeTree()
 	`, store.database, store.routesTable))
 	if err != nil {
@@ -238,11 +239,12 @@ func (store *ClickHouseMetricStore) createTablesIfNotExist() error {
 	// Create heart rate data table if not exists
 	_, err = store.db.Exec(fmt.Sprintf(`
 		CREATE TABLE IF NOT EXISTS %s.%s (
-			workout_id UInt64,
+			workout_name String,
+			workout_start DateTime,
 			timestamp DateTime,
 			qty Float64,
 			units String,
-			PRIMARY KEY (workout_id, timestamp)
+			PRIMARY KEY (workout_name, workout_start, timestamp)
 		) ENGINE = MergeTree()
 	`, store.database, store.heartRateDataTable))
 	if err != nil {
@@ -252,11 +254,12 @@ func (store *ClickHouseMetricStore) createTablesIfNotExist() error {
 	// Create heart rate recovery table if not exists
 	_, err = store.db.Exec(fmt.Sprintf(`
 		CREATE TABLE IF NOT EXISTS %s.%s (
-			workout_id UInt64,
+			workout_name String,
+			workout_start DateTime,
 			timestamp DateTime,
 			qty Float64,
 			units String,
-			PRIMARY KEY (workout_id, timestamp)
+			PRIMARY KEY (workout_name, workout_start, timestamp)
 		) ENGINE = MergeTree()
 	`, store.database, store.heartRateRecoveryTable))
 	if err != nil {
@@ -290,7 +293,6 @@ func (store *ClickHouseMetricStore) StoreWorkouts(workouts []request.Workout) er
 		flights_climbed_qty, flights_climbed_units, temperature_qty, temperature_units,
 		elevation_ascent, elevation_descent, elevation_units) 
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-		RETURNING id
 	`, store.database, store.workoutsTable))
 	if err != nil {
 		return fmt.Errorf("failed to prepare statement: %w", err)
@@ -300,22 +302,22 @@ func (store *ClickHouseMetricStore) StoreWorkouts(workouts []request.Workout) er
 	// We'll use direct ExecContext calls for route data instead of preparing a statement
 	routeQuery := fmt.Sprintf(`
 		INSERT INTO %s.%s
-		(workout_id, timestamp, lat, lon, altitude)
-		VALUES (?, ?, ?, ?, ?)
+		(workout_name, workout_start, timestamp, lat, lon, altitude)
+		VALUES (?, ?, ?, ?, ?, ?)
 	`, store.database, store.routesTable)
 
 	// We'll use direct ExecContext calls for heart rate data instead of preparing a statement
 	heartRateDataQuery := fmt.Sprintf(`
 		INSERT INTO %s.%s
-		(workout_id, timestamp, qty, units)
-		VALUES (?, ?, ?, ?)
+		(workout_name, workout_start, timestamp, qty, units)
+		VALUES (?, ?, ?, ?, ?)
 	`, store.database, store.heartRateDataTable)
 
 	// We'll use direct ExecContext calls for heart rate recovery data instead of preparing a statement
 	heartRateRecoveryQuery := fmt.Sprintf(`
 		INSERT INTO %s.%s
-		(workout_id, timestamp, qty, units)
-		VALUES (?, ?, ?, ?)
+		(workout_name, workout_start, timestamp, qty, units)
+		VALUES (?, ?, ?, ?, ?)
 	`, store.database, store.heartRateRecoveryTable)
 
 	// Insert workouts
@@ -335,9 +337,8 @@ func (store *ClickHouseMetricStore) StoreWorkouts(workouts []request.Workout) er
 
 		// No need to convert heart rate data to JSON anymore as we'll store it in separate tables
 
-		// Insert workout data and get the ID
-		var workoutID string
-		err = stmt.QueryRowContext(ctx,
+		// Insert workout data
+		_, err = stmt.ExecContext(ctx,
 			workout.Name,
 			startTime,
 			endTime,
@@ -372,7 +373,7 @@ func (store *ClickHouseMetricStore) StoreWorkouts(workouts []request.Workout) er
 			workout.Elevation.Ascent,
 			workout.Elevation.Descent,
 			workout.Elevation.Units,
-		).Scan(&workoutID)
+		)
 		if err != nil {
 			return fmt.Errorf("failed to insert workout: %w", err)
 		}
@@ -388,7 +389,8 @@ func (store *ClickHouseMetricStore) StoreWorkouts(workouts []request.Workout) er
 			}
 
 			_, err = tx.ExecContext(ctx, routeQuery,
-				workoutID,
+				workout.Name,
+				startTime,
 				routeTimestamp,
 				routePoint.Lat,
 				routePoint.Lon,
@@ -410,7 +412,8 @@ func (store *ClickHouseMetricStore) StoreWorkouts(workouts []request.Workout) er
 			}
 
 			_, err = tx.ExecContext(ctx, heartRateDataQuery,
-				workoutID,
+				workout.Name,
+				startTime,
 				heartRateTimestamp,
 				heartRatePoint.Qty,
 				heartRatePoint.Units,
@@ -431,7 +434,8 @@ func (store *ClickHouseMetricStore) StoreWorkouts(workouts []request.Workout) er
 			}
 
 			_, err = tx.ExecContext(ctx, heartRateRecoveryQuery,
-				workoutID,
+				workout.Name,
+				startTime,
 				heartRateRecoveryTimestamp,
 				heartRateRecoveryPoint.Qty,
 				heartRateRecoveryPoint.Units,
