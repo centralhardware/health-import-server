@@ -388,7 +388,8 @@ func (store *ClickHouseMetricStore) StoreWorkouts(workouts []request.Workout) er
 				routeTimestamp = startTime
 			}
 
-			_, err = tx.ExecContext(ctx, routeQuery,
+			// Use the database connection directly instead of the transaction
+			_, err = store.db.ExecContext(ctx, routeQuery,
 				workout.Name,
 				startTime,
 				routeTimestamp,
@@ -411,7 +412,8 @@ func (store *ClickHouseMetricStore) StoreWorkouts(workouts []request.Workout) er
 				heartRateTimestamp = startTime
 			}
 
-			_, err = tx.ExecContext(ctx, heartRateDataQuery,
+			// Use the database connection directly instead of the transaction
+			_, err = store.db.ExecContext(ctx, heartRateDataQuery,
 				workout.Name,
 				startTime,
 				heartRateTimestamp,
@@ -433,7 +435,8 @@ func (store *ClickHouseMetricStore) StoreWorkouts(workouts []request.Workout) er
 				heartRateRecoveryTimestamp = startTime
 			}
 
-			_, err = tx.ExecContext(ctx, heartRateRecoveryQuery,
+			// Use the database connection directly instead of the transaction
+			_, err = store.db.ExecContext(ctx, heartRateRecoveryQuery,
 				workout.Name,
 				startTime,
 				heartRateRecoveryTimestamp,
