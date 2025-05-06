@@ -10,16 +10,18 @@ import (
 )
 
 type ClickHouseConfig struct {
-	DSN          string `json:"dsn"`
-	Database     string `json:"database"`
-	MetricsTable string `json:"metrics_table"`
-	CreateTables bool   `json:"create_tables"`
+	DSN           string `json:"dsn"`
+	Database      string `json:"database"`
+	MetricsTable  string `json:"metrics_table"`
+	WorkoutsTable string `json:"workouts_table"`
+	CreateTables  bool   `json:"create_tables"`
 }
 
 type ClickHouseMetricStore struct {
-	db           *sql.DB
-	database     string
-	metricsTable string
+	db            *sql.DB
+	database      string
+	metricsTable  string
+	workoutsTable string
 }
 
 func NewClickHouseMetricStore(config ClickHouseConfig) (*ClickHouseMetricStore, error) {
@@ -33,9 +35,10 @@ func NewClickHouseMetricStore(config ClickHouseConfig) (*ClickHouseMetricStore, 
 	}
 
 	store := &ClickHouseMetricStore{
-		db:           db,
-		database:     config.Database,
-		metricsTable: config.MetricsTable,
+		db:            db,
+		database:      config.Database,
+		metricsTable:  config.MetricsTable,
+		workoutsTable: config.WorkoutsTable,
 	}
 
 	if config.CreateTables {
@@ -158,6 +161,100 @@ func (store *ClickHouseMetricStore) createTablesIfNotExist() error {
 	`, store.database, store.metricsTable))
 	if err != nil {
 		return fmt.Errorf("failed to create metrics table: %w", err)
+	}
+
+	// Create workouts table if not exists
+	_, err = store.db.Exec(fmt.Sprintf(`
+		CREATE TABLE IF NOT EXISTS %s.%s (
+			name String,
+			start DateTime,
+			end DateTime,
+			total_energy_qty Float64 DEFAULT 0,
+			total_energy_units String DEFAULT '',
+			active_energy_qty Float64 DEFAULT 0,
+			active_energy_units String DEFAULT '',
+			avg_heart_rate_qty Float64 DEFAULT 0,
+			avg_heart_rate_units String DEFAULT '',
+			max_heart_rate_qty Float64 DEFAULT 0,
+			max_heart_rate_units String DEFAULT '',
+			distance_qty Float64 DEFAULT 0,
+			distance_units String DEFAULT '',
+			step_count_qty Float64 DEFAULT 0,
+			step_count_units String DEFAULT '',
+			PRIMARY KEY (start, name)
+		) ENGINE = MergeTree()
+	`, store.database, store.workoutsTable))
+	if err != nil {
+		return fmt.Errorf("failed to create workouts table: %w", err)
+	}
+
+	return nil
+}
+
+func (store *ClickHouseMetricStore) StoreWorkouts(workouts []request.Workout) error {
+	if len(workouts) == 0 {
+		return nil
+	}
+
+	ctx := context.Background()
+	tx, err := store.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback()
+
+	// Prepare statement for inserting workouts
+	stmt, err := tx.PrepareContext(ctx, fmt.Sprintf(`
+		INSERT INTO %s.%s 
+		(name, start, end, total_energy_qty, total_energy_units, active_energy_qty, active_energy_units, 
+		avg_heart_rate_qty, avg_heart_rate_units, max_heart_rate_qty, max_heart_rate_units, 
+		distance_qty, distance_units, step_count_qty, step_count_units) 
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`, store.database, store.workoutsTable))
+	if err != nil {
+		return fmt.Errorf("failed to prepare statement: %w", err)
+	}
+	defer stmt.Close()
+
+	// Insert workouts
+	for _, workout := range workouts {
+		// Handle nil timestamps
+		var startTime, endTime time.Time
+		if workout.Start != nil {
+			startTime = workout.Start.ToTime()
+		} else {
+			startTime = time.Now()
+		}
+		if workout.End != nil {
+			endTime = workout.End.ToTime()
+		} else {
+			endTime = time.Now()
+		}
+
+		_, err = stmt.ExecContext(ctx,
+			workout.Name,
+			startTime,
+			endTime,
+			workout.TotalEnergy.Qty,
+			workout.TotalEnergy.Units,
+			workout.ActiveEnergy.Qty,
+			workout.ActiveEnergy.Units,
+			workout.AvgHeartRate.Qty,
+			workout.AvgHeartRate.Units,
+			workout.MaxHeartRate.Qty,
+			workout.MaxHeartRate.Units,
+			workout.Distance.Qty,
+			workout.Distance.Units,
+			workout.StepCount.Qty,
+			workout.StepCount.Units,
+		)
+		if err != nil {
+			return fmt.Errorf("failed to insert workout: %w", err)
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("failed to commit transaction: %w", err)
 	}
 
 	return nil

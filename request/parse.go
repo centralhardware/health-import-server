@@ -5,7 +5,7 @@ import (
 	"log"
 )
 
-var LogUnknownMetrics = false
+var LogUnknownMetrics = true
 
 type APIExportRequest struct {
 	Metrics          []Metric  `json:"metrics"`

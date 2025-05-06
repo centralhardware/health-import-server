@@ -14,6 +14,7 @@ import (
 const CLICKHOUSE_DSN = "CLICKHOUSE_DSN"
 const CLICKHOUSE_DATABASE = "CLICKHOUSE_DATABASE"
 const CLICKHOUSE_METRICS_TABLE = "CLICKHOUSE_METRICS_TABLE"
+const CLICKHOUSE_WORKOUTS_TABLE = "CLICKHOUSE_WORKOUTS_TABLE"
 const CLICKHOUSE_CREATE_TABLES = "CLICKHOUSE_CREATE_TABLES"
 
 type metricStoreLoader func(json.RawMessage) (MetricStore, error)
@@ -117,6 +118,7 @@ func loadClickHouseMetricStoreFromEnvironment() (MetricStore, error) {
 	dsn, dsnSet := os.LookupEnv(CLICKHOUSE_DSN)
 	database, databaseSet := os.LookupEnv(CLICKHOUSE_DATABASE)
 	metricsTable, metricsTableSet := os.LookupEnv(CLICKHOUSE_METRICS_TABLE)
+	workoutsTable, workoutsTableSet := os.LookupEnv(CLICKHOUSE_WORKOUTS_TABLE)
 	createTablesStr, createTablesSet := os.LookupEnv(CLICKHOUSE_CREATE_TABLES)
 
 	if !dsnSet && !databaseSet && !metricsTableSet {
@@ -143,11 +145,17 @@ func loadClickHouseMetricStoreFromEnvironment() (MetricStore, error) {
 		createTables = true
 	}
 
+	// Use metrics table name as default for workouts table if not set
+	if !workoutsTableSet {
+		workoutsTable = metricsTable + "_workouts"
+	}
+
 	config := clickhouse.ClickHouseConfig{
-		DSN:          dsn,
-		Database:     database,
-		MetricsTable: metricsTable,
-		CreateTables: createTables,
+		DSN:           dsn,
+		Database:      database,
+		MetricsTable:  metricsTable,
+		WorkoutsTable: workoutsTable,
+		CreateTables:  createTables,
 	}
 
 	store, err := clickhouse.NewClickHouseMetricStore(config)

@@ -41,15 +41,26 @@ func (handler *ImportHandler) handle(req *http.Request) (string, error) {
 	}
 
 	populatedMetrics := export.PopulatedMetrics()
-	log.Printf("Total metrics: %d (%d populated) Total samples %d\n", len(export.Metrics), len(populatedMetrics), export.TotalSamples())
+	log.Printf("Total metrics: %d (%d populated) Total samples %d Total workouts: %d\n", len(export.Metrics), len(populatedMetrics), export.TotalSamples(), len(export.Workouts))
 
 	// TODO: May want to not fail fast here? run all metric stores before erroring to avoid data loss?
 	for _, metricStore := range handler.MetricStores {
 		log.Printf("Starting upload to metric store \"%s\".", metricStore.Name())
+
+		// Store metrics
 		if err = metricStore.Store(populatedMetrics); err != nil {
-			log.Printf("Failed upload to metric store \"%s\" with error: %s.", metricStore.Name(), err.Error())
+			log.Printf("Failed upload metrics to metric store \"%s\" with error: %s.", metricStore.Name(), err.Error())
 			return "", err
 		}
+
+		// Store workouts
+		if len(export.Workouts) > 0 {
+			if err = metricStore.StoreWorkouts(export.Workouts); err != nil {
+				log.Printf("Failed upload workouts to metric store \"%s\" with error: %s.", metricStore.Name(), err.Error())
+				return "", err
+			}
+		}
+
 		log.Printf("Finished upload to metric store \"%s\".", metricStore.Name())
 	}
 

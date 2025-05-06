@@ -59,6 +59,7 @@ func printConfigurationExplanation() {
 	fmt.Println("- CLICKHOUSE_DSN")
 	fmt.Println("- CLICKHOUSE_DATABASE")
 	fmt.Println("- CLICKHOUSE_METRICS_TABLE")
+	fmt.Println("- CLICKHOUSE_WORKOUTS_TABLE")
 	fmt.Println("- CLICKHOUSE_CREATE_TABLES")
 	fmt.Printf("\n")
 
@@ -69,6 +70,7 @@ func printConfigurationExplanation() {
 	fmt.Println("\t\t\"dsn\": \"clickhouse://username:password@hostname:9000/database?dial_timeout=10s\",")
 	fmt.Println("\t\t\"database\": \"health\",")
 	fmt.Println("\t\t\"metrics_table\": \"metrics\",")
+	fmt.Println("\t\t\"workouts_table\": \"workouts\",")
 	fmt.Println("\t\t\"create_tables\": true")
 	fmt.Println("\t}")
 	fmt.Println("]")
