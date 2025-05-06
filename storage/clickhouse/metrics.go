@@ -6,6 +6,7 @@ import (
 	"fmt"
 	_ "github.com/ClickHouse/clickhouse-go/v2"
 	"github.com/joeecarter/health-import-server/request"
+	
 )
 
 type ClickHouseConfig struct {
@@ -73,7 +74,14 @@ func (store *ClickHouseMetricStore) Store(metrics []request.Metric) error {
 	for _, metric := range metrics {
 		metricType := request.LookupMetricType(metric.Name)
 		for _, sample := range metric.Samples {
-			timestamp := sample.GetTimestamp().ToTime()
+			// Handle nil timestamp
+			var timestamp time.Time
+			if ts := sample.GetTimestamp(); ts != nil {
+				timestamp = ts.ToTime()
+			} else {
+				// Skip samples with nil timestamps
+				continue
+			}
 
 			// Default values
 			var qty, max, min, avg, asleep, inBed float64
