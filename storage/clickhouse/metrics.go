@@ -487,8 +487,27 @@ func (store *ClickHouseMetricStore) StoreWorkouts(workouts []request.Workout) er
 				startIdx := i * 33
 
 				// Format timestamps
-				start := workoutValues[startIdx+1].(time.Time).Format("2006-01-02 15:04:05")
-				end := workoutValues[startIdx+2].(time.Time).Format("2006-01-02 15:04:05")
+				var start, end string
+
+				// Handle start time - could be string or time.Time
+				switch v := workoutValues[startIdx+1].(type) {
+				case time.Time:
+					start = v.Format("2006-01-02 15:04:05")
+				case string:
+					start = v
+				default:
+					start = fmt.Sprintf("%v", v)
+				}
+
+				// Handle end time - could be string or time.Time
+				switch v := workoutValues[startIdx+2].(type) {
+				case time.Time:
+					end = v.Format("2006-01-02 15:04:05")
+				case string:
+					end = v
+				default:
+					end = fmt.Sprintf("%v", v)
+				}
 
 				if i > batchStart {
 					query.WriteString(", ")
@@ -565,8 +584,27 @@ func (store *ClickHouseMetricStore) StoreWorkouts(workouts []request.Workout) er
 				startIdx := i * 6
 
 				// Format timestamps
-				workoutStart := routeValues[startIdx+1].(time.Time).Format("2006-01-02 15:04:05")
-				timestamp := routeValues[startIdx+2].(time.Time).Format("2006-01-02 15:04:05")
+				var workoutStart, timestamp string
+
+				// Handle workout start time - could be string or time.Time
+				switch v := routeValues[startIdx+1].(type) {
+				case time.Time:
+					workoutStart = v.Format("2006-01-02 15:04:05")
+				case string:
+					workoutStart = v
+				default:
+					workoutStart = fmt.Sprintf("%v", v)
+				}
+
+				// Handle timestamp - could be string or time.Time
+				switch v := routeValues[startIdx+2].(type) {
+				case time.Time:
+					timestamp = v.Format("2006-01-02 15:04:05")
+				case string:
+					timestamp = v
+				default:
+					timestamp = fmt.Sprintf("%v", v)
+				}
 
 				if i > batchStart {
 					query.WriteString(", ")
@@ -615,8 +653,27 @@ func (store *ClickHouseMetricStore) StoreWorkouts(workouts []request.Workout) er
 				startIdx := i * 5
 
 				// Format timestamps
-				workoutStart := heartRateDataValues[startIdx+1].(time.Time).Format("2006-01-02 15:04:05")
-				timestamp := heartRateDataValues[startIdx+2].(time.Time).Format("2006-01-02 15:04:05")
+				var workoutStart, timestamp string
+
+				// Handle workout start time - could be string or time.Time
+				switch v := heartRateDataValues[startIdx+1].(type) {
+				case time.Time:
+					workoutStart = v.Format("2006-01-02 15:04:05")
+				case string:
+					workoutStart = v
+				default:
+					workoutStart = fmt.Sprintf("%v", v)
+				}
+
+				// Handle timestamp - could be string or time.Time
+				switch v := heartRateDataValues[startIdx+2].(type) {
+				case time.Time:
+					timestamp = v.Format("2006-01-02 15:04:05")
+				case string:
+					timestamp = v
+				default:
+					timestamp = fmt.Sprintf("%v", v)
+				}
 
 				if i > batchStart {
 					query.WriteString(", ")
@@ -664,8 +721,27 @@ func (store *ClickHouseMetricStore) StoreWorkouts(workouts []request.Workout) er
 				startIdx := i * 5
 
 				// Format timestamps
-				workoutStart := heartRateRecoveryValues[startIdx+1].(time.Time).Format("2006-01-02 15:04:05")
-				timestamp := heartRateRecoveryValues[startIdx+2].(time.Time).Format("2006-01-02 15:04:05")
+				var workoutStart, timestamp string
+
+				// Handle workout start time - could be string or time.Time
+				switch v := heartRateRecoveryValues[startIdx+1].(type) {
+				case time.Time:
+					workoutStart = v.Format("2006-01-02 15:04:05")
+				case string:
+					workoutStart = v
+				default:
+					workoutStart = fmt.Sprintf("%v", v)
+				}
+
+				// Handle timestamp - could be string or time.Time
+				switch v := heartRateRecoveryValues[startIdx+2].(type) {
+				case time.Time:
+					timestamp = v.Format("2006-01-02 15:04:05")
+				case string:
+					timestamp = v
+				default:
+					timestamp = fmt.Sprintf("%v", v)
+				}
 
 				if i > batchStart {
 					query.WriteString(", ")
