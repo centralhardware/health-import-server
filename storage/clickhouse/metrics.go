@@ -534,38 +534,54 @@ func (store *ClickHouseMetricStore) StoreWorkouts(workouts []request.Workout) er
 					}
 				}
 
+				// Helper function to safely convert to string
+				safeString := func(val interface{}) string {
+					switch v := val.(type) {
+					case string:
+						return v
+					case float64:
+						return fmt.Sprintf("%v", v)
+					case int:
+						return fmt.Sprintf("%v", v)
+					case time.Time:
+						return v.Format("2006-01-02 15:04:05")
+					default:
+						return fmt.Sprintf("%v", v)
+					}
+				}
+
 				query.WriteString(fmt.Sprintf("('%s', toDateTime('%s'), toDateTime('%s'), %f, '%s', %f, '%s', %f, '%s', %f, '%s', %f, '%s', %f, '%s', %f, '%s', %f, '%s', %f, '%s', %f, '%s', %f, '%s', %f, '%s', %f, '%s', %f, '%s', %f, %f, '%s')",
-					workoutValues[startIdx].(string),
+					safeString(workoutValues[startIdx]),
 					start,
 					end,
 					safeFloat64(workoutValues[startIdx+3]),
-					workoutValues[startIdx+4].(string),
+					safeString(workoutValues[startIdx+4]),
 					safeFloat64(workoutValues[startIdx+5]),
-					workoutValues[startIdx+6].(string),
+					safeString(workoutValues[startIdx+6]),
 					safeFloat64(workoutValues[startIdx+7]),
-					workoutValues[startIdx+8].(string),
+					safeString(workoutValues[startIdx+8]),
 					safeFloat64(workoutValues[startIdx+9]),
-					workoutValues[startIdx+10].(string),
+					safeString(workoutValues[startIdx+10]),
 					safeFloat64(workoutValues[startIdx+11]),
-					workoutValues[startIdx+12].(string),
+					safeString(workoutValues[startIdx+12]),
 					safeFloat64(workoutValues[startIdx+13]),
-					workoutValues[startIdx+14].(string),
+					safeString(workoutValues[startIdx+14]),
 					safeFloat64(workoutValues[startIdx+15]),
-					workoutValues[startIdx+16].(string),
+					safeString(workoutValues[startIdx+16]),
 					safeFloat64(workoutValues[startIdx+17]),
-					workoutValues[startIdx+18].(string),
+					safeString(workoutValues[startIdx+18]),
 					safeFloat64(workoutValues[startIdx+19]),
-					workoutValues[startIdx+20].(string),
+					safeString(workoutValues[startIdx+20]),
 					safeFloat64(workoutValues[startIdx+21]),
-					workoutValues[startIdx+22].(string),
+					safeString(workoutValues[startIdx+22]),
 					safeFloat64(workoutValues[startIdx+23]),
-					workoutValues[startIdx+24].(string),
+					safeString(workoutValues[startIdx+24]),
 					safeFloat64(workoutValues[startIdx+25]),
-					workoutValues[startIdx+26].(string),
+					safeString(workoutValues[startIdx+26]),
 					safeFloat64(workoutValues[startIdx+27]),
-					workoutValues[startIdx+28].(string),
+					safeString(workoutValues[startIdx+28]),
 					safeFloat64(workoutValues[startIdx+29]),
-					workoutValues[startIdx+30].(string),
+					safeString(workoutValues[startIdx+30]),
 					safeFloat64(workoutValues[startIdx+31]),
 					safeFloat64(workoutValues[startIdx+32]),
 					fmt.Sprintf("'%v'", workoutValues[startIdx+32])))
@@ -650,8 +666,24 @@ func (store *ClickHouseMetricStore) StoreWorkouts(workouts []request.Workout) er
 					}
 				}
 
+				// Helper function to safely convert to string
+				safeString := func(val interface{}) string {
+					switch v := val.(type) {
+					case string:
+						return v
+					case float64:
+						return fmt.Sprintf("%v", v)
+					case int:
+						return fmt.Sprintf("%v", v)
+					case time.Time:
+						return v.Format("2006-01-02 15:04:05")
+					default:
+						return fmt.Sprintf("%v", v)
+					}
+				}
+
 				query.WriteString(fmt.Sprintf("('%s', toDateTime('%s'), toDateTime('%s'), %f, %f, %f)",
-					routeValues[startIdx].(string),
+					safeString(routeValues[startIdx]),
 					workoutStart,
 					timestamp,
 					safeFloat64(routeValues[startIdx+3]),
@@ -738,12 +770,28 @@ func (store *ClickHouseMetricStore) StoreWorkouts(workouts []request.Workout) er
 					}
 				}
 
+				// Helper function to safely convert to string
+				safeString := func(val interface{}) string {
+					switch v := val.(type) {
+					case string:
+						return v
+					case float64:
+						return fmt.Sprintf("%v", v)
+					case int:
+						return fmt.Sprintf("%v", v)
+					case time.Time:
+						return v.Format("2006-01-02 15:04:05")
+					default:
+						return fmt.Sprintf("%v", v)
+					}
+				}
+
 				query.WriteString(fmt.Sprintf("('%s', toDateTime('%s'), toDateTime('%s'), %f, '%s')",
-					heartRateDataValues[startIdx].(string),
+					safeString(heartRateDataValues[startIdx]),
 					workoutStart,
 					timestamp,
 					safeFloat64(heartRateDataValues[startIdx+3]),
-					heartRateDataValues[startIdx+4].(string)))
+					safeString(heartRateDataValues[startIdx+4])))
 			}
 
 			// Execute the batch insert
@@ -825,12 +873,28 @@ func (store *ClickHouseMetricStore) StoreWorkouts(workouts []request.Workout) er
 					}
 				}
 
+				// Helper function to safely convert to string
+				safeString := func(val interface{}) string {
+					switch v := val.(type) {
+					case string:
+						return v
+					case float64:
+						return fmt.Sprintf("%v", v)
+					case int:
+						return fmt.Sprintf("%v", v)
+					case time.Time:
+						return v.Format("2006-01-02 15:04:05")
+					default:
+						return fmt.Sprintf("%v", v)
+					}
+				}
+
 				query.WriteString(fmt.Sprintf("('%s', toDateTime('%s'), toDateTime('%s'), %f, '%s')",
-					heartRateRecoveryValues[startIdx].(string),
+					safeString(heartRateRecoveryValues[startIdx]),
 					workoutStart,
 					timestamp,
 					safeFloat64(heartRateRecoveryValues[startIdx+3]),
-					heartRateRecoveryValues[startIdx+4].(string)))
+					safeString(heartRateRecoveryValues[startIdx+4])))
 			}
 
 			// Execute the batch insert
