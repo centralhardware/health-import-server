@@ -495,9 +495,18 @@ func (store *ClickHouseMetricStore) StoreWorkouts(workouts []request.Workout) er
 				case time.Time:
 					start = v.Format("2006-01-02 15:04:05")
 				case string:
-					start = v
+					// Try to parse as time if it's a string
+					if t, err := time.Parse(time.RFC3339, v); err == nil {
+						start = t.Format("2006-01-02 15:04:05")
+					} else if _, err := time.Parse("2006-01-02 15:04:05", v); err == nil {
+						start = v
+					} else {
+						// If it's not a valid time string, use a default
+						start = time.Now().Format("2006-01-02 15:04:05")
+					}
 				default:
-					start = fmt.Sprintf("%v", v)
+					// For any other type, use current time
+					start = time.Now().Format("2006-01-02 15:04:05")
 				}
 
 				// Handle end time - could be string or time.Time
@@ -505,9 +514,18 @@ func (store *ClickHouseMetricStore) StoreWorkouts(workouts []request.Workout) er
 				case time.Time:
 					end = v.Format("2006-01-02 15:04:05")
 				case string:
-					end = v
+					// Try to parse as time if it's a string
+					if t, err := time.Parse(time.RFC3339, v); err == nil {
+						end = t.Format("2006-01-02 15:04:05")
+					} else if _, err := time.Parse("2006-01-02 15:04:05", v); err == nil {
+						end = v
+					} else {
+						// If it's not a valid time string, use a default
+						end = time.Now().Format("2006-01-02 15:04:05")
+					}
 				default:
-					end = fmt.Sprintf("%v", v)
+					// For any other type, use current time
+					end = time.Now().Format("2006-01-02 15:04:05")
 				}
 
 				if i > batchStart {
@@ -550,8 +568,11 @@ func (store *ClickHouseMetricStore) StoreWorkouts(workouts []request.Workout) er
 					}
 				}
 
+				// Ensure proper formatting for ClickHouse
+				workoutName := safeString(workoutValues[startIdx])
+
 				query.WriteString(fmt.Sprintf("('%s', toDateTime('%s'), toDateTime('%s'), %f, '%s', %f, '%s', %f, '%s', %f, '%s', %f, '%s', %f, '%s', %f, '%s', %f, '%s', %f, '%s', %f, '%s', %f, '%s', %f, '%s', %f, '%s', %f, '%s', %f, %f, '%s')",
-					safeString(workoutValues[startIdx]),
+					workoutName,
 					start,
 					end,
 					safeFloat64(workoutValues[startIdx+3]),
@@ -584,7 +605,7 @@ func (store *ClickHouseMetricStore) StoreWorkouts(workouts []request.Workout) er
 					safeString(workoutValues[startIdx+30]),
 					safeFloat64(workoutValues[startIdx+31]),
 					safeFloat64(workoutValues[startIdx+32]),
-					fmt.Sprintf("'%v'", workoutValues[startIdx+32])))
+					safeString(workoutValues[startIdx+32])))
 			}
 
 			// Execute the batch insert
