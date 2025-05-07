@@ -172,7 +172,7 @@ func (store *ClickHouseMetricStore) createTablesIfNotExist() error {
 			sleep_source LowCardinality(String) DEFAULT '',
 			in_bed_source LowCardinality(String) DEFAULT '',
 			PRIMARY KEY (timestamp, metric_name)
-  ) ENGINE = ReplacingMergeTree(timestamp, metric_name)
+  ) ENGINE = ReplacingMergeTree(timestamp)
 	`, store.database, store.metricsTable))
 	if err != nil {
 		return fmt.Errorf("failed to create metrics table: %w", err)
@@ -216,8 +216,8 @@ func (store *ClickHouseMetricStore) createTablesIfNotExist() error {
 			elevation_ascent Float64 DEFAULT 0,
 			elevation_descent Float64 DEFAULT 0,
 			elevation_units LowCardinality(String) DEFAULT '',
-			PRIMARY KEY (name, start)
-  ) ENGINE = ReplacingMergeTree(name, start)
+			PRIMARY KEY (start, end)
+  ) ENGINE = ReplacingMergeTree(start, end)
 	`, store.database, store.workoutsTable))
 	if err != nil {
 		return fmt.Errorf("failed to create workouts table: %w", err)
@@ -239,7 +239,7 @@ func (store *ClickHouseMetricStore) createTablesIfNotExist() error {
 			speed Float64 DEFAULT 0,
 			speed_accuracy Float64 DEFAULT 0,
 			PRIMARY KEY (workout_name, workout_start, timestamp)
-  ) ENGINE = ReplacingMergeTree(workout_name, workout_start, timestamp)
+  ) ENGINE = ReplacingMergeTree(workout_start, timestamp)
 	`, store.database, store.routesTable))
 	if err != nil {
 		return fmt.Errorf("failed to create routes table: %w", err)
@@ -258,7 +258,7 @@ func (store *ClickHouseMetricStore) createTablesIfNotExist() error {
 			units LowCardinality(String),
 			source LowCardinality(String),
 			PRIMARY KEY (workout_name, workout_start, timestamp)
-  ) ENGINE = ReplacingMergeTree(workout_name, workout_start, timestamp)
+  ) ENGINE = ReplacingMergeTree(workout_start, timestamp)
 	`, store.database, store.heartRateDataTable))
 	if err != nil {
 		return fmt.Errorf("failed to create heart rate data table: %w", err)
@@ -277,7 +277,7 @@ func (store *ClickHouseMetricStore) createTablesIfNotExist() error {
 			units LowCardinality(String),
 			source LowCardinality(String),
 			PRIMARY KEY (workout_name, workout_start, timestamp)
-  ) ENGINE = ReplacingMergeTree(workout_name, workout_start, timestamp)
+  ) ENGINE = ReplacingMergeTree(workout_start, timestamp)
 	`, store.database, store.heartRateRecoveryTable))
 	if err != nil {
 		return fmt.Errorf("failed to create heart rate recovery table: %w", err)
@@ -293,7 +293,7 @@ func (store *ClickHouseMetricStore) createTablesIfNotExist() error {
 			units LowCardinality(String),
 			source LowCardinality(String),
 			PRIMARY KEY (workout_name, workout_start, timestamp)
-  ) ENGINE = ReplacingMergeTree(workout_name, workout_start, timestamp)
+  ) ENGINE = ReplacingMergeTree(workout_start, timestamp)
 	`, store.database, store.stepCountLogTable))
 	if err != nil {
 		return fmt.Errorf("failed to create step count log table: %w", err)
@@ -309,7 +309,7 @@ func (store *ClickHouseMetricStore) createTablesIfNotExist() error {
 			units LowCardinality(String),
 			source LowCardinality(String),
 			PRIMARY KEY (workout_name, workout_start, timestamp)
-  ) ENGINE = ReplacingMergeTree(workout_name, workout_start, timestamp)
+  ) ENGINE = ReplacingMergeTree(workout_start, timestamp)
 	`, store.database, store.walkingAndRunningDistanceTable))
 	if err != nil {
 		return fmt.Errorf("failed to create walking and running distance table: %w", err)
