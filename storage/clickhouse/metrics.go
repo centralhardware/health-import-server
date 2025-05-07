@@ -19,6 +19,7 @@ type ClickHouseConfig struct {
 	CreateTables  bool   `json:"create_tables"`
 }
 
+type ClickHouseMetricStore struct {
 	db                             *sql.DB
 	database                       string
 	metricsTable                   string
@@ -27,7 +28,6 @@ type ClickHouseConfig struct {
 	heartRateDataTable             string
 	heartRateRecoveryTable         string
 	stepCountLogTable              string
-	stepCountLogTable           string
 	walkingAndRunningDistanceTable string
 }
 
@@ -41,6 +41,7 @@ func NewClickHouseMetricStore(config ClickHouseConfig) (*ClickHouseMetricStore, 
 		return nil, fmt.Errorf("failed to ping ClickHouse: %w", err)
 	}
 
+	store := &ClickHouseMetricStore{
 		db:                             db,
 		database:                       config.Database,
 		metricsTable:                   config.MetricsTable,
@@ -49,7 +50,6 @@ func NewClickHouseMetricStore(config ClickHouseConfig) (*ClickHouseMetricStore, 
 		heartRateDataTable:             "workout_heart_rate_data",
 		heartRateRecoveryTable:         "workout_heart_rate_recovery",
 		stepCountLogTable:              "workout_step_count_log",
-		stepCountLogTable:           "workout_step_count_log",
 		walkingAndRunningDistanceTable: "workout_walking_running_distance",
 	}
 
@@ -445,7 +445,7 @@ func (store *ClickHouseMetricStore) StoreWorkouts(workouts []request.Workout) er
 			if err != nil {
 				return fmt.Errorf("failed to insert route point: %w", err)
 			}
-			log.Printf("Inserted route point for workout '%s': lat=%f, lon=%f at %s", 
+			log.Printf("Inserted route point for workout '%s': lat=%f, lon=%f at %s",
 				workout.Name, routePoint.Lat, routePoint.Lon, routeTimestamp.Format(time.RFC3339))
 		}
 
@@ -555,7 +555,7 @@ func (store *ClickHouseMetricStore) StoreWorkouts(workouts []request.Workout) er
 			if err != nil {
 				return fmt.Errorf("failed to insert step count log data point: %w", err)
 			}
-			log.Printf("Inserted step count data for workout '%s': %v %s at %s", 
+			log.Printf("Inserted step count data for workout '%s': %v %s at %s",
 				workout.Name, stepCountPoint.Qty, stepCountPoint.Units, stepCountTimestamp.Format(time.RFC3339))
 		}
 
@@ -589,7 +589,7 @@ func (store *ClickHouseMetricStore) StoreWorkouts(workouts []request.Workout) er
 			if err != nil {
 				return fmt.Errorf("failed to insert walking and running distance data point: %w", err)
 			}
-			log.Printf("Inserted walking/running distance data for workout '%s': %v %s at %s", 
+			log.Printf("Inserted walking/running distance data for workout '%s': %v %s at %s",
 				workout.Name, walkingRunningPoint.Qty, walkingRunningPoint.Units, walkingRunningTimestamp.Format(time.RFC3339))
 		}
 	}
