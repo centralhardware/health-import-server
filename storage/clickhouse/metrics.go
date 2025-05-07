@@ -445,7 +445,6 @@ func (store *ClickHouseMetricStore) StoreWorkouts(workouts []request.Workout) er
 			if err != nil {
 				return fmt.Errorf("failed to insert route point: %w", err)
 			}
-			log.Printf("Inserted route point for workout '%s': lat=%f, lon=%f at %s",
 			log.Printf("Inserted route point for workout '%s': lat=%f, lon=%f at %s", 
 				workout.Name, routePoint.Lat, routePoint.Lon, routeTimestamp.Format(time.RFC3339))
 		}
@@ -485,7 +484,6 @@ func (store *ClickHouseMetricStore) StoreWorkouts(workouts []request.Workout) er
 			}
 			log.Printf("Inserted heart rate data for workout '%s': min=%v, max=%v, avg=%v %s at %s",
 				workout.Name, heartRatePoint.Min, heartRatePoint.Max, heartRatePoint.Avg,
-				workout.Name, heartRatePoint.Min, heartRatePoint.Max, heartRatePoint.Avg, 
 				heartRatePoint.Units, heartRateTimestamp.Format(time.RFC3339))
 		}
 
@@ -524,7 +522,6 @@ func (store *ClickHouseMetricStore) StoreWorkouts(workouts []request.Workout) er
 			}
 			log.Printf("Inserted heart rate recovery data for workout '%s': min=%v, max=%v, avg=%v %s at %s",
 				workout.Name, heartRateRecoveryPoint.Min, heartRateRecoveryPoint.Max, heartRateRecoveryPoint.Avg,
-				workout.Name, heartRateRecoveryPoint.Min, heartRateRecoveryPoint.Max, heartRateRecoveryPoint.Avg, 
 				heartRateRecoveryPoint.Units, heartRateRecoveryTimestamp.Format(time.RFC3339))
 		}
 
@@ -558,7 +555,6 @@ func (store *ClickHouseMetricStore) StoreWorkouts(workouts []request.Workout) er
 			if err != nil {
 				return fmt.Errorf("failed to insert step count log data point: %w", err)
 			}
-			log.Printf("Inserted step count data for workout '%s': %v %s at %s",
 			log.Printf("Inserted step count data for workout '%s': %v %s at %s", 
 				workout.Name, stepCountPoint.Qty, stepCountPoint.Units, stepCountTimestamp.Format(time.RFC3339))
 		}
@@ -593,7 +589,6 @@ func (store *ClickHouseMetricStore) StoreWorkouts(workouts []request.Workout) er
 			if err != nil {
 				return fmt.Errorf("failed to insert walking and running distance data point: %w", err)
 			}
-			log.Printf("Inserted walking/running distance data for workout '%s': %v %s at %s",
 			log.Printf("Inserted walking/running distance data for workout '%s': %v %s at %s", 
 				workout.Name, walkingRunningPoint.Qty, walkingRunningPoint.Units, walkingRunningTimestamp.Format(time.RFC3339))
 		}
