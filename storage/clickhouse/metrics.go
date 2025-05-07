@@ -308,7 +308,7 @@ func (store *ClickHouseMetricStore) createTablesIfNotExist() error {
 			qty Float64,
 			units LowCardinality(String),
 			source LowCardinality(String),
-			PRIMARY KEY (workout_name, workout_start, timestamp)
+			PRIMARY KEY (workout_start, timestamp)
   ) ENGINE = ReplacingMergeTree(workout_start, timestamp)
 	`, store.database, store.walkingAndRunningDistanceTable))
 	if err != nil {
