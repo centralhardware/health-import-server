@@ -48,9 +48,11 @@ func (handler *ImportHandler) handle(req *http.Request) (string, error) {
 		log.Printf("Starting upload to metric store \"%s\".", metricStore.Name())
 
 		// Store metrics
-		if err = metricStore.Store(populatedMetrics); err != nil {
-			log.Printf("Failed upload metrics to metric store \"%s\" with error: %s.", metricStore.Name(), err.Error())
-			return "", err
+		if len(populatedMetrics) > 0 {
+			if err = metricStore.Store(populatedMetrics); err != nil {
+				log.Printf("Failed upload metrics to metric store \"%s\" with error: %s.", metricStore.Name(), err.Error())
+				return "", err
+			}
 		}
 
 		// Store workouts

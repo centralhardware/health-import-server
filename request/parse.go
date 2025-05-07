@@ -64,12 +64,14 @@ func (p *Parser) Parse() (*APIExportRequest, error) {
 	}
 
 	metrics := make([]Metric, 0)
-	for _, jsonMetric := range j.Data.Metrics {
-		metric, err := p.parseMetric(jsonMetric)
-		if err != nil {
-			return nil, err
+	if j.Data.Metrics != nil {
+		for _, jsonMetric := range j.Data.Metrics {
+			metric, err := p.parseMetric(jsonMetric)
+			if err != nil {
+				return nil, err
+			}
+			metrics = append(metrics, metric)
 		}
-		metrics = append(metrics, metric)
 	}
 
 	return &APIExportRequest{

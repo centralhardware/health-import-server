@@ -6,6 +6,8 @@ import (
 	"fmt"
 	_ "github.com/ClickHouse/clickhouse-go/v2"
 	"github.com/joeecarter/health-import-server/request"
+	"log"
+
 	"time"
 )
 
@@ -17,14 +19,16 @@ type ClickHouseConfig struct {
 	CreateTables  bool   `json:"create_tables"`
 }
 
-type ClickHouseMetricStore struct {
-	db                     *sql.DB
-	database               string
-	metricsTable           string
-	workoutsTable          string
-	routesTable            string
-	heartRateDataTable     string
-	heartRateRecoveryTable string
+	db                             *sql.DB
+	database                       string
+	metricsTable                   string
+	workoutsTable                  string
+	routesTable                    string
+	heartRateDataTable             string
+	heartRateRecoveryTable         string
+	stepCountLogTable              string
+	stepCountLogTable           string
+	walkingAndRunningDistanceTable string
 }
 
 func NewClickHouseMetricStore(config ClickHouseConfig) (*ClickHouseMetricStore, error) {
@@ -37,14 +41,16 @@ func NewClickHouseMetricStore(config ClickHouseConfig) (*ClickHouseMetricStore, 
 		return nil, fmt.Errorf("failed to ping ClickHouse: %w", err)
 	}
 
-	store := &ClickHouseMetricStore{
-		db:                     db,
-		database:               config.Database,
-		metricsTable:           config.MetricsTable,
-		workoutsTable:          config.WorkoutsTable,
-		routesTable:            "workout_routes",
-		heartRateDataTable:     "workout_heart_rate_data",
-		heartRateRecoveryTable: "workout_heart_rate_recovery",
+		db:                             db,
+		database:                       config.Database,
+		metricsTable:                   config.MetricsTable,
+		workoutsTable:                  config.WorkoutsTable,
+		routesTable:                    "workout_routes",
+		heartRateDataTable:             "workout_heart_rate_data",
+		heartRateRecoveryTable:         "workout_heart_rate_recovery",
+		stepCountLogTable:              "workout_step_count_log",
+		stepCountLogTable:           "workout_step_count_log",
+		walkingAndRunningDistanceTable: "workout_walking_running_distance",
 	}
 
 	if config.CreateTables {
@@ -65,6 +71,7 @@ func (store *ClickHouseMetricStore) Store(metrics []request.Metric) error {
 		return nil
 	}
 
+	log.Printf("Inserting %d metrics into ClickHouse", len(metrics))
 	ctx := context.Background()
 
 	// Process all metrics and insert them one by one
@@ -126,6 +133,8 @@ func (store *ClickHouseMetricStore) Store(metrics []request.Metric) error {
 			if err != nil {
 				return fmt.Errorf("failed to insert metric: %w", err)
 			}
+
+			log.Printf("Inserted metric: %s (%s) at %s", metric.Name, metric.Unit, timestamp.Format(time.RFC3339))
 		}
 	}
 
@@ -151,17 +160,17 @@ func (store *ClickHouseMetricStore) createTablesIfNotExist() error {
 	_, err = store.db.Exec(fmt.Sprintf(`
 		CREATE TABLE IF NOT EXISTS %s.%s (
 			timestamp DateTime,
-			metric_name String,
-			metric_unit String,
-			metric_type String,
+			metric_name LowCardinality(String),
+			metric_unit LowCardinality(String),
+			metric_type LowCardinality(String),
 			qty Float64 DEFAULT 0,
 			max Float64 DEFAULT 0,
 			min Float64 DEFAULT 0,
 			avg Float64 DEFAULT 0,
 			asleep Float64 DEFAULT 0,
 			in_bed Float64 DEFAULT 0,
-			sleep_source String DEFAULT '',
-			in_bed_source String DEFAULT '',
+			sleep_source LowCardinality(String) DEFAULT '',
+			in_bed_source LowCardinality(String) DEFAULT '',
 			PRIMARY KEY (timestamp, metric_name)
 		) ENGINE = MergeTree()
 	`, store.database, store.metricsTable))
@@ -173,40 +182,40 @@ func (store *ClickHouseMetricStore) createTablesIfNotExist() error {
 	_, err = store.db.Exec(fmt.Sprintf(`
 		CREATE TABLE IF NOT EXISTS %s.%s (
 			id UInt64 NOT NULL AUTO_INCREMENT,
-			name String,
+			name LowCardinality(String),
 			start DateTime,
 			end DateTime,
 			total_energy_qty Float64 DEFAULT 0,
-			total_energy_units String DEFAULT '',
+			total_energy_units LowCardinality(String) DEFAULT '',
 			active_energy_qty Float64 DEFAULT 0,
-			active_energy_units String DEFAULT '',
+			active_energy_units LowCardinality(String) DEFAULT '',
 			avg_heart_rate_qty Float64 DEFAULT 0,
-			avg_heart_rate_units String DEFAULT '',
+			avg_heart_rate_units LowCardinality(String) DEFAULT '',
 			max_heart_rate_qty Float64 DEFAULT 0,
-			max_heart_rate_units String DEFAULT '',
+			max_heart_rate_units LowCardinality(String) DEFAULT '',
 			distance_qty Float64 DEFAULT 0,
-			distance_units String DEFAULT '',
+			distance_units LowCardinality(String) DEFAULT '',
 			step_count_qty Float64 DEFAULT 0,
-			step_count_units String DEFAULT '',
+			step_count_units LowCardinality(String) DEFAULT '',
 			step_cadence_qty Float64 DEFAULT 0,
-			step_cadence_units String DEFAULT '',
+			step_cadence_units LowCardinality(String) DEFAULT '',
 			speed_qty Float64 DEFAULT 0,
-			speed_units String DEFAULT '',
+			speed_units LowCardinality(String) DEFAULT '',
 			swim_cadence_qty Float64 DEFAULT 0,
-			swim_cadence_units String DEFAULT '',
+			swim_cadence_units LowCardinality(String) DEFAULT '',
 			intensity_qty Float64 DEFAULT 0,
-			intensity_units String DEFAULT '',
+			intensity_units LowCardinality(String) DEFAULT '',
 			humidity_qty Float64 DEFAULT 0,
-			humidity_units String DEFAULT '',
+			humidity_units LowCardinality(String) DEFAULT '',
 			total_swimming_stroke_count_qty Float64 DEFAULT 0,
-			total_swimming_stroke_count_units String DEFAULT '',
+			total_swimming_stroke_count_units LowCardinality(String) DEFAULT '',
 			flights_climbed_qty Float64 DEFAULT 0,
-			flights_climbed_units String DEFAULT '',
+			flights_climbed_units LowCardinality(String) DEFAULT '',
 			temperature_qty Float64 DEFAULT 0,
-			temperature_units String DEFAULT '',
+			temperature_units LowCardinality(String) DEFAULT '',
 			elevation_ascent Float64 DEFAULT 0,
 			elevation_descent Float64 DEFAULT 0,
-			elevation_units String DEFAULT '',
+			elevation_units LowCardinality(String) DEFAULT '',
 			PRIMARY KEY (id)
 		) ENGINE = MergeTree()
 	`, store.database, store.workoutsTable))
@@ -217,12 +226,18 @@ func (store *ClickHouseMetricStore) createTablesIfNotExist() error {
 	// Create routes table if not exists
 	_, err = store.db.Exec(fmt.Sprintf(`
 		CREATE TABLE IF NOT EXISTS %s.%s (
-			workout_name String,
+			workout_name LowCardinality(String),
 			workout_start DateTime,
 			timestamp DateTime,
 			lat Float64,
 			lon Float64,
 			altitude Float64,
+			course Float64 DEFAULT 0,
+			vertical_accuracy Float64 DEFAULT 0,
+			horizontal_accuracy Float64 DEFAULT 0,
+			course_accuracy Float64 DEFAULT 0,
+			speed Float64 DEFAULT 0,
+			speed_accuracy Float64 DEFAULT 0,
 			PRIMARY KEY (workout_name, workout_start, timestamp)
 		) ENGINE = MergeTree()
 	`, store.database, store.routesTable))
@@ -233,11 +248,15 @@ func (store *ClickHouseMetricStore) createTablesIfNotExist() error {
 	// Create heart rate data table if not exists
 	_, err = store.db.Exec(fmt.Sprintf(`
 		CREATE TABLE IF NOT EXISTS %s.%s (
-			workout_name String,
+			workout_name LowCardinality(String),
 			workout_start DateTime,
 			timestamp DateTime,
 			qty Float64,
-			units String,
+			min Float64,
+			max Float64,
+			avg Float64,
+			units LowCardinality(String),
+			source LowCardinality(String),
 			PRIMARY KEY (workout_name, workout_start, timestamp)
 		) ENGINE = MergeTree()
 	`, store.database, store.heartRateDataTable))
@@ -248,16 +267,52 @@ func (store *ClickHouseMetricStore) createTablesIfNotExist() error {
 	// Create heart rate recovery table if not exists
 	_, err = store.db.Exec(fmt.Sprintf(`
 		CREATE TABLE IF NOT EXISTS %s.%s (
-			workout_name String,
+			workout_name LowCardinality(String),
 			workout_start DateTime,
 			timestamp DateTime,
 			qty Float64,
-			units String,
+			min Float64,
+			max Float64,
+			avg Float64,
+			units LowCardinality(String),
+			source LowCardinality(String),
 			PRIMARY KEY (workout_name, workout_start, timestamp)
 		) ENGINE = MergeTree()
 	`, store.database, store.heartRateRecoveryTable))
 	if err != nil {
 		return fmt.Errorf("failed to create heart rate recovery table: %w", err)
+	}
+
+	// Create step count log table if not exists
+	_, err = store.db.Exec(fmt.Sprintf(`
+		CREATE TABLE IF NOT EXISTS %s.%s (
+			workout_name LowCardinality(String),
+			workout_start DateTime,
+			timestamp DateTime,
+			qty Float64,
+			units LowCardinality(String),
+			source LowCardinality(String),
+			PRIMARY KEY (workout_name, workout_start, timestamp)
+		) ENGINE = MergeTree()
+	`, store.database, store.stepCountLogTable))
+	if err != nil {
+		return fmt.Errorf("failed to create step count log table: %w", err)
+	}
+
+	// Create walking and running distance table if not exists
+	_, err = store.db.Exec(fmt.Sprintf(`
+		CREATE TABLE IF NOT EXISTS %s.%s (
+			workout_name LowCardinality(String),
+			workout_start DateTime,
+			timestamp DateTime,
+			qty Float64,
+			units LowCardinality(String),
+			source LowCardinality(String),
+			PRIMARY KEY (workout_name, workout_start, timestamp)
+		) ENGINE = MergeTree()
+	`, store.database, store.walkingAndRunningDistanceTable))
+	if err != nil {
+		return fmt.Errorf("failed to create walking and running distance table: %w", err)
 	}
 
 	return nil
@@ -268,6 +323,7 @@ func (store *ClickHouseMetricStore) StoreWorkouts(workouts []request.Workout) er
 		return nil
 	}
 
+	log.Printf("Inserting %d workouts into ClickHouse", len(workouts))
 	ctx := context.Background()
 
 	// Process all workouts and insert them one by one
@@ -285,11 +341,7 @@ func (store *ClickHouseMetricStore) StoreWorkouts(workouts []request.Workout) er
 			endTime = time.Now()
 		}
 
-		// Format timestamps
-		start := startTime.Format("2006-01-02 15:04:05")
-		end := endTime.Format("2006-01-02 15:04:05")
-
-		// Insert workout
+		// Insert workout using parameterized query
 		workoutQuery := fmt.Sprintf(`
 			INSERT INTO %s.%s 
 			(name, start, end, total_energy_qty, total_energy_units, active_energy_qty, active_energy_units, 
@@ -302,48 +354,60 @@ func (store *ClickHouseMetricStore) StoreWorkouts(workouts []request.Workout) er
 			elevation_ascent, elevation_descent, elevation_units) 
 			SETTINGS async_insert=1, wait_for_async_insert=0
 			VALUES 
-			('%s', toDateTime('%s'), toDateTime('%s'), %f, '%s', %f, '%s', %f, '%s', %f, '%s', %f, '%s', %f, '%s', %f, '%s', %f, '%s', %f, '%s', %f, '%s', %f, '%s', %f, '%s', %f, '%s', %f, '%s', %f, %f, '%s')
-		`, store.database, store.workoutsTable,
-			workout.Name,
-			start,
-			end,
-			float64(workout.TotalEnergy.Qty),
-			workout.TotalEnergy.Units,
-			float64(workout.ActiveEnergy.Qty),
-			workout.ActiveEnergy.Units,
-			float64(workout.AvgHeartRate.Qty),
-			workout.AvgHeartRate.Units,
-			float64(workout.MaxHeartRate.Qty),
-			workout.MaxHeartRate.Units,
-			float64(workout.Distance.Qty),
-			workout.Distance.Units,
-			float64(workout.StepCount.Qty),
-			workout.StepCount.Units,
-			float64(workout.StepCadence.Qty),
-			workout.StepCadence.Units,
-			float64(workout.Speed.Qty),
-			workout.Speed.Units,
-			float64(workout.SwimCadence.Qty),
-			workout.SwimCadence.Units,
-			float64(workout.Intensity.Qty),
-			workout.Intensity.Units,
-			float64(workout.Humidity.Qty),
-			workout.Humidity.Units,
-			float64(workout.TotalSwimmingStrokeCount.Qty),
-			workout.TotalSwimmingStrokeCount.Units,
-			float64(workout.FlightsClimbed.Qty),
-			workout.FlightsClimbed.Units,
-			float64(workout.Temperature.Qty),
-			workout.Temperature.Units,
-			float64(workout.Elevation.Ascent),
-			float64(workout.Elevation.Descent),
-			workout.Elevation.Units)
+			(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		`, store.database, store.workoutsTable)
 
-		// Execute the workout insert
-		_, err := store.db.ExecContext(ctx, workoutQuery)
+		// Execute the workout insert with parameters
+		_, err := store.db.ExecContext(ctx, workoutQuery,
+			workout.Name,
+			startTime,
+			endTime,
+			workout.TotalEnergy.Qty,
+			workout.TotalEnergy.Units,
+			workout.ActiveEnergy.Qty,
+			workout.ActiveEnergy.Units,
+			workout.AvgHeartRate.Qty,
+			workout.AvgHeartRate.Units,
+			workout.MaxHeartRate.Qty,
+			workout.MaxHeartRate.Units,
+			workout.Distance.Qty,
+			workout.Distance.Units,
+			func() float64 {
+				if len(workout.StepCount) > 0 {
+					return workout.StepCount[0].Qty
+				}
+				return 0
+			}(),
+			func() string {
+				if len(workout.StepCount) > 0 {
+					return workout.StepCount[0].Units
+				}
+				return ""
+			}(),
+			workout.StepCadence.Qty,
+			workout.StepCadence.Units,
+			workout.Speed.Qty,
+			workout.Speed.Units,
+			workout.SwimCadence.Qty,
+			workout.SwimCadence.Units,
+			workout.Intensity.Qty,
+			workout.Intensity.Units,
+			workout.Humidity.Qty,
+			workout.Humidity.Units,
+			workout.TotalSwimmingStrokeCount.Qty,
+			workout.TotalSwimmingStrokeCount.Units,
+			workout.FlightsClimbed.Qty,
+			workout.FlightsClimbed.Units,
+			workout.Temperature.Qty,
+			workout.Temperature.Units,
+			workout.Elevation.Ascent,
+			workout.Elevation.Descent,
+			workout.Elevation.Units)
 		if err != nil {
 			return fmt.Errorf("failed to insert workout: %w", err)
 		}
+
+		log.Printf("Inserted workout: %s (start: %s, end: %s)", workout.Name, startTime.Format(time.RFC3339), endTime.Format(time.RFC3339))
 
 		// Process route data
 		for _, routePoint := range workout.Route {
@@ -355,29 +419,35 @@ func (store *ClickHouseMetricStore) StoreWorkouts(workouts []request.Workout) er
 				routeTimestamp = startTime
 			}
 
-			// Format timestamp
-			timestamp := routeTimestamp.Format("2006-01-02 15:04:05")
-
-			// Insert route point
+			// Insert route point using parameterized query
 			routeQuery := fmt.Sprintf(`
 				INSERT INTO %s.%s
-				(workout_name, workout_start, timestamp, lat, lon, altitude)
+				(workout_name, workout_start, timestamp, lat, lon, altitude, course, vertical_accuracy, horizontal_accuracy, course_accuracy, speed, speed_accuracy)
 				SETTINGS async_insert=1, wait_for_async_insert=0
 				VALUES 
-				('%s', toDateTime('%s'), toDateTime('%s'), %f, %f, %f)
-			`, store.database, store.routesTable,
-				workout.Name,
-				start,
-				timestamp,
-				float64(routePoint.Lat),
-				float64(routePoint.Lon),
-				float64(routePoint.Altitude))
+				(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			`, store.database, store.routesTable)
 
-			// Execute the route point insert
-			_, err := store.db.ExecContext(ctx, routeQuery)
+			// Execute the route point insert with parameters
+			_, err := store.db.ExecContext(ctx, routeQuery,
+				workout.Name,
+				startTime,
+				routeTimestamp,
+				routePoint.Lat,
+				routePoint.Lon,
+				routePoint.Altitude,
+				routePoint.Course,
+				routePoint.VerticalAccuracy,
+				routePoint.HorizontalAccuracy,
+				routePoint.CourseAccuracy,
+				routePoint.Speed,
+				routePoint.SpeedAccuracy)
 			if err != nil {
 				return fmt.Errorf("failed to insert route point: %w", err)
 			}
+			log.Printf("Inserted route point for workout '%s': lat=%f, lon=%f at %s",
+			log.Printf("Inserted route point for workout '%s': lat=%f, lon=%f at %s", 
+				workout.Name, routePoint.Lat, routePoint.Lon, routeTimestamp.Format(time.RFC3339))
 		}
 
 		// Process heart rate data
@@ -390,28 +460,33 @@ func (store *ClickHouseMetricStore) StoreWorkouts(workouts []request.Workout) er
 				heartRateTimestamp = startTime
 			}
 
-			// Format timestamp
-			timestamp := heartRateTimestamp.Format("2006-01-02 15:04:05")
-
-			// Insert heart rate data point
+			// Insert heart rate data point using parameterized query
 			heartRateQuery := fmt.Sprintf(`
 				INSERT INTO %s.%s
-				(workout_name, workout_start, timestamp, qty, units)
+				(workout_name, workout_start, timestamp, qty, min, max, avg, units, source)
 				SETTINGS async_insert=1, wait_for_async_insert=0
 				VALUES 
-				('%s', toDateTime('%s'), toDateTime('%s'), %f, '%s')
-			`, store.database, store.heartRateDataTable,
-				workout.Name,
-				start,
-				timestamp,
-				float64(heartRatePoint.Qty),
-				heartRatePoint.Units)
+				(?, ?, ?, ?, ?, ?, ?, ?, ?)
+			`, store.database, store.heartRateDataTable)
 
-			// Execute the heart rate data point insert
-			_, err := store.db.ExecContext(ctx, heartRateQuery)
+			// Execute the heart rate data point insert with parameters
+			_, err := store.db.ExecContext(ctx, heartRateQuery,
+				workout.Name,
+				startTime,
+				heartRateTimestamp,
+				heartRatePoint.Qty,
+				heartRatePoint.Min,
+				heartRatePoint.Max,
+				heartRatePoint.Avg,
+				heartRatePoint.Units,
+				heartRatePoint.Source)
 			if err != nil {
 				return fmt.Errorf("failed to insert heart rate data point: %w", err)
 			}
+			log.Printf("Inserted heart rate data for workout '%s': min=%v, max=%v, avg=%v %s at %s",
+				workout.Name, heartRatePoint.Min, heartRatePoint.Max, heartRatePoint.Avg,
+				workout.Name, heartRatePoint.Min, heartRatePoint.Max, heartRatePoint.Avg, 
+				heartRatePoint.Units, heartRateTimestamp.Format(time.RFC3339))
 		}
 
 		// Process heart rate recovery data
@@ -424,28 +499,103 @@ func (store *ClickHouseMetricStore) StoreWorkouts(workouts []request.Workout) er
 				heartRateRecoveryTimestamp = startTime
 			}
 
-			// Format timestamp
-			timestamp := heartRateRecoveryTimestamp.Format("2006-01-02 15:04:05")
-
-			// Insert heart rate recovery data point
+			// Insert heart rate recovery data point using parameterized query
 			heartRateRecoveryQuery := fmt.Sprintf(`
 				INSERT INTO %s.%s
-				(workout_name, workout_start, timestamp, qty, units)
+				(workout_name, workout_start, timestamp, qty, min, max, avg, units, source)
 				SETTINGS async_insert=1, wait_for_async_insert=0
 				VALUES 
-				('%s', toDateTime('%s'), toDateTime('%s'), %f, '%s')
-			`, store.database, store.heartRateRecoveryTable,
-				workout.Name,
-				start,
-				timestamp,
-				float64(heartRateRecoveryPoint.Qty),
-				heartRateRecoveryPoint.Units)
+				(?, ?, ?, ?, ?, ?, ?, ?, ?)
+			`, store.database, store.heartRateRecoveryTable)
 
-			// Execute the heart rate recovery data point insert
-			_, err := store.db.ExecContext(ctx, heartRateRecoveryQuery)
+			// Execute the heart rate recovery data point insert with parameters
+			_, err := store.db.ExecContext(ctx, heartRateRecoveryQuery,
+				workout.Name,
+				startTime,
+				heartRateRecoveryTimestamp,
+				heartRateRecoveryPoint.Qty,
+				heartRateRecoveryPoint.Min,
+				heartRateRecoveryPoint.Max,
+				heartRateRecoveryPoint.Avg,
+				heartRateRecoveryPoint.Units,
+				heartRateRecoveryPoint.Source)
 			if err != nil {
 				return fmt.Errorf("failed to insert heart rate recovery data point: %w", err)
 			}
+			log.Printf("Inserted heart rate recovery data for workout '%s': min=%v, max=%v, avg=%v %s at %s",
+				workout.Name, heartRateRecoveryPoint.Min, heartRateRecoveryPoint.Max, heartRateRecoveryPoint.Avg,
+				workout.Name, heartRateRecoveryPoint.Min, heartRateRecoveryPoint.Max, heartRateRecoveryPoint.Avg, 
+				heartRateRecoveryPoint.Units, heartRateRecoveryTimestamp.Format(time.RFC3339))
+		}
+
+		// Process step count log data
+		for _, stepCountPoint := range workout.StepCount {
+			var stepCountTimestamp time.Time
+			if stepCountPoint.Date != nil {
+				stepCountTimestamp = stepCountPoint.Date.ToTime()
+			} else {
+				// Use workout start time if timestamp is missing
+				stepCountTimestamp = startTime
+			}
+
+			// Insert step count log data point using parameterized query
+			stepCountQuery := fmt.Sprintf(`
+				INSERT INTO %s.%s
+				(workout_name, workout_start, timestamp, qty, units, source)
+				SETTINGS async_insert=1, wait_for_async_insert=0
+				VALUES 
+				(?, ?, ?, ?, ?, ?)
+			`, store.database, store.stepCountLogTable)
+
+			// Execute the step count log data point insert with parameters
+			_, err := store.db.ExecContext(ctx, stepCountQuery,
+				workout.Name,
+				startTime,
+				stepCountTimestamp,
+				stepCountPoint.Qty,
+				stepCountPoint.Units,
+				stepCountPoint.Source)
+			if err != nil {
+				return fmt.Errorf("failed to insert step count log data point: %w", err)
+			}
+			log.Printf("Inserted step count data for workout '%s': %v %s at %s",
+			log.Printf("Inserted step count data for workout '%s': %v %s at %s", 
+				workout.Name, stepCountPoint.Qty, stepCountPoint.Units, stepCountTimestamp.Format(time.RFC3339))
+		}
+
+		// Process walking and running distance data
+		for _, walkingRunningPoint := range workout.WalkingAndRunningDistance {
+			var walkingRunningTimestamp time.Time
+			if walkingRunningPoint.Date != nil {
+				walkingRunningTimestamp = walkingRunningPoint.Date.ToTime()
+			} else {
+				// Use workout start time if timestamp is missing
+				walkingRunningTimestamp = startTime
+			}
+
+			// Insert walking and running distance data point using parameterized query
+			walkingRunningQuery := fmt.Sprintf(`
+				INSERT INTO %s.%s
+				(workout_name, workout_start, timestamp, qty, units, source)
+				SETTINGS async_insert=1, wait_for_async_insert=0
+				VALUES 
+				(?, ?, ?, ?, ?, ?)
+			`, store.database, store.walkingAndRunningDistanceTable)
+
+			// Execute the walking and running distance data point insert with parameters
+			_, err := store.db.ExecContext(ctx, walkingRunningQuery,
+				workout.Name,
+				startTime,
+				walkingRunningTimestamp,
+				walkingRunningPoint.Qty,
+				walkingRunningPoint.Units,
+				walkingRunningPoint.Source)
+			if err != nil {
+				return fmt.Errorf("failed to insert walking and running distance data point: %w", err)
+			}
+			log.Printf("Inserted walking/running distance data for workout '%s': %v %s at %s",
+			log.Printf("Inserted walking/running distance data for workout '%s': %v %s at %s", 
+				workout.Name, walkingRunningPoint.Qty, walkingRunningPoint.Units, walkingRunningTimestamp.Format(time.RFC3339))
 		}
 	}
 

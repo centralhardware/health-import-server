@@ -5,27 +5,30 @@ import (
 )
 
 type Workout struct {
-	Name                     string         `json:"name"`
-	Start                    *Timestamp     `json:"start"`
-	End                      *Timestamp     `json:"end"`
-	TotalEnergy              QtyUnit        `json:"totalEnergy"`
-	ActiveEnergy             QtyUnit        `json:"activeEnergy"`
-	AvgHeartRate             QtyUnit        `json:"avgHeartRate"`
-	StepCadence              QtyUnit        `json:"stepCadence"`
-	Speed                    QtyUnit        `json:"speed"`
-	SwimCadence              QtyUnit        `json:"swimCadence"`
-	Intensity                QtyUnit        `json:"intesity"`
-	Humidity                 QtyUnit        `json:"humidity"`
-	TotalSwimmingStrokeCount QtyUnit        `json:"totalSwimmingStrokeCount"`
-	FlightsClimbed           QtyUnit        `json:"flightsClimbed"`
-	MaxHeartRate             QtyUnit        `json:"maxHeartRate"`
-	Distance                 QtyUnit        `json:"distance"`
-	StepCount                QtyUnit        `json:"stepCount"`
-	Temperature              QtyUnit        `json:"temperature"`
-	Elevation                Elevation      `json:"elevation"`
-	Route                    []GPSLog       `json:"route"`
-	HeartRateData            []HeartRateLog `json:"heartRateData"`
-	HeartRateRecovery        []HeartRateLog `json:"heartRateRecovery"`
+	ID                        string         `json:"id,omitempty"`
+	Name                      string         `json:"name,omitempty"`
+	Location                  string         `json:"location,omitempty"`
+	Start                     *Timestamp     `json:"start,omitempty"`
+	End                       *Timestamp     `json:"end,omitempty"`
+	TotalEnergy               QtyUnit        `json:"totalEnergy,omitempty"`
+	ActiveEnergy              QtyUnit        `json:"activeEnergy,omitempty"`
+	AvgHeartRate              QtyUnit        `json:"avgHeartRate,omitempty"`
+	StepCadence               QtyUnit        `json:"stepCadence,omitempty"`
+	Speed                     QtyUnit        `json:"speed,omitempty"`
+	SwimCadence               QtyUnit        `json:"swimCadence,omitempty"`
+	Intensity                 QtyUnit        `json:"intensity,omitempty"` // Fixed typo in json tag
+	Humidity                  QtyUnit        `json:"humidity,omitempty"`
+	TotalSwimmingStrokeCount  QtyUnit        `json:"totalSwimmingStrokeCount,omitempty"`
+	FlightsClimbed            QtyUnit        `json:"flightsClimbed,omitempty"`
+	MaxHeartRate              QtyUnit        `json:"maxHeartRate,omitempty"`
+	Distance                  QtyUnit        `json:"distance,omitempty"`
+	StepCount                 []StepCountLog `json:"stepCount,omitempty"`
+	WalkingAndRunningDistance []StepCountLog `json:"walkingAndRunningDistance,omitempty"`
+	Temperature               QtyUnit        `json:"temperature,omitempty"`
+	Elevation                 Elevation      `json:"elevation,omitempty"`
+	Route                     []GPSLog       `json:"route,omitempty"`
+	HeartRateData             []HeartRateLog `json:"heartRateData,omitempty"`
+	HeartRateRecovery         []HeartRateLog `json:"heartRateRecovery,omitempty"`
 }
 
 type QtyUnit struct {
@@ -56,10 +59,16 @@ func (q *QtyUnit) UnmarshalJSON(data []byte) error {
 }
 
 type GPSLog struct {
-	Lat       float64    `json:"lat"`
-	Lon       float64    `json:"lon"`
-	Altitude  float64    `json:"altitude"`
-	Timestamp *Timestamp `json:"timestamp"`
+	Lat                float64    `json:"latitude"`
+	Lon                float64    `json:"longitude"`
+	Altitude           float64    `json:"altitude"`
+	Timestamp          *Timestamp `json:"timestamp"`
+	Course             float64    `json:"course,omitempty"`
+	VerticalAccuracy   float64    `json:"verticalAccuracy,omitempty"`
+	HorizontalAccuracy float64    `json:"horizontalAccuracy,omitempty"`
+	CourseAccuracy     float64    `json:"courseAccuracy,omitempty"`
+	Speed              float64    `json:"speed,omitempty"`
+	SpeedAccuracy      float64    `json:"speedAccuracy,omitempty"`
 }
 
 type Elevation struct {
@@ -68,8 +77,19 @@ type Elevation struct {
 	Units   string  `json:"units"`
 }
 
+type StepCountLog struct {
+	Qty    float64    `json:"qty"`
+	Source string     `json:"source"`
+	Units  string     `json:"units"`
+	Date   *Timestamp `json:"date"`
+}
+
 type HeartRateLog struct {
-	Units string     `json:"units"`
-	Date  *Timestamp `json:"date"`
-	Qty   float64    `json:"qty"`
+	Min    float64    `json:"Min,omitempty"`
+	Max    float64    `json:"Max,omitempty"`
+	Avg    float64    `json:"Avg,omitempty"`
+	Units  string     `json:"units"`
+	Source string     `json:"source,omitempty"`
+	Date   *Timestamp `json:"date"`
+	Qty    float64    `json:"qty,omitempty"`
 }

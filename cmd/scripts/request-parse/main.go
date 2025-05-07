@@ -32,7 +32,10 @@ func main() {
 	}
 
 	if shouldLogJson {
+		fmt.Println("Metrics:")
 		printJson(req.Metrics)
+		fmt.Println("\nWorkouts:")
+		printJson(req.Workouts)
 	}
 }
 
