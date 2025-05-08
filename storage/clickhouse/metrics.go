@@ -44,8 +44,8 @@ func NewClickHouseMetricStore(config ClickHouseConfig) (*ClickHouseMetricStore, 
 	store := &ClickHouseMetricStore{
 		db:                             db,
 		database:                       config.Database,
-		metricsTable:                   config.MetricsTable,
-		workoutsTable:                  config.WorkoutsTable,
+		metricsTable:                   "metrics",
+		workoutsTable:                  "workouts",
 		routesTable:                    "workout_routes",
 		heartRateDataTable:             "workout_heart_rate_data",
 		heartRateRecoveryTable:         "workout_heart_rate_recovery",
@@ -592,6 +592,33 @@ func (store *ClickHouseMetricStore) StoreWorkouts(workouts []request.Workout) er
 			log.Printf("Inserted walking/running distance data for workout '%s': %v %s at %s",
 				workout.Name, walkingRunningPoint.Qty, walkingRunningPoint.Units, walkingRunningTimestamp.Format(time.RFC3339))
 		}
+	}
+
+	return nil
+}
+
+func (store *ClickHouseMetricStore) OptimizeTables() error {
+	log.Printf("Running OPTIMIZE TABLE FINAL for all tables")
+	ctx := context.Background()
+
+	// List of all tables to optimize
+	tables := []string{
+		store.metricsTable,
+		store.workoutsTable,
+		store.routesTable,
+		store.heartRateDataTable,
+		store.heartRateRecoveryTable,
+		store.stepCountLogTable,
+		store.walkingAndRunningDistanceTable,
+	}
+
+	// Run OPTIMIZE TABLE FINAL for each table
+	for _, table := range tables {
+		query := fmt.Sprintf("OPTIMIZE TABLE %s.%s FINAL", store.database, table)
+		if _, err := store.db.ExecContext(ctx, query); err != nil {
+			return fmt.Errorf("failed to optimize table %s: %w", table, err)
+		}
+		log.Printf("Optimized table %s.%s", store.database, table)
 	}
 
 	return nil

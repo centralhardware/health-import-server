@@ -9,4 +9,6 @@ type MetricStore interface {
 	Name() string
 	Store(metrics []request.Metric) error
 	StoreWorkouts(workouts []request.Workout) error
+	OptimizeTables() error
+	Close() error
 }

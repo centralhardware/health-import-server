@@ -1,6 +1,7 @@
 package server
 
 import (
+	"fmt"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -41,30 +42,52 @@ func (handler *ImportHandler) handle(req *http.Request) (string, error) {
 	}
 
 	populatedMetrics := export.PopulatedMetrics()
-	log.Printf("Total metrics: %d (%d populated) Total samples %d Total workouts: %d\n", len(export.Metrics), len(populatedMetrics), export.TotalSamples(), len(export.Workouts))
+	totalMetrics := len(export.Metrics)
+	populatedMetricsCount := len(populatedMetrics)
+	totalSamples := export.TotalSamples()
+	totalWorkouts := len(export.Workouts)
 
-	// TODO: May want to not fail fast here? run all metric stores before erroring to avoid data loss?
-	for _, metricStore := range handler.MetricStores {
-		log.Printf("Starting upload to metric store \"%s\".", metricStore.Name())
+	log.Printf("Total metrics: %d (%d populated) Total samples %d Total workouts: %d\n",
+		totalMetrics, populatedMetricsCount, totalSamples, totalWorkouts)
 
-		// Store metrics
-		if len(populatedMetrics) > 0 {
-			if err = metricStore.Store(populatedMetrics); err != nil {
-				log.Printf("Failed upload metrics to metric store \"%s\" with error: %s.", metricStore.Name(), err.Error())
-				return "", err
+	// Create a detailed response message immediately
+	responseMsg := fmt.Sprintf("Processing request. Received %d metrics (%d populated), %d samples, and %d workouts.",
+		totalMetrics, populatedMetricsCount, totalSamples, totalWorkouts)
+
+	// Process data in the background
+	go func() {
+		// Copy data to avoid race conditions
+		localPopulatedMetrics := populatedMetrics
+		localWorkouts := export.Workouts
+
+		for _, metricStore := range handler.MetricStores {
+			log.Printf("Starting upload to metric store \"%s\".", metricStore.Name())
+
+			// Store metrics
+			if len(localPopulatedMetrics) > 0 {
+				if err := metricStore.Store(localPopulatedMetrics); err != nil {
+					log.Printf("Failed upload metrics to metric store \"%s\" with error: %s.", metricStore.Name(), err.Error())
+					continue
+				}
 			}
-		}
 
-		// Store workouts
-		if len(export.Workouts) > 0 {
-			if err = metricStore.StoreWorkouts(export.Workouts); err != nil {
-				log.Printf("Failed upload workouts to metric store \"%s\" with error: %s.", metricStore.Name(), err.Error())
-				return "", err
+			// Store workouts
+			if len(localWorkouts) > 0 {
+				if err := metricStore.StoreWorkouts(localWorkouts); err != nil {
+					log.Printf("Failed upload workouts to metric store \"%s\" with error: %s.", metricStore.Name(), err.Error())
+					continue
+				}
 			}
+
+			// Optimize tables after data is stored
+			if err := metricStore.OptimizeTables(); err != nil {
+				log.Printf("Failed to optimize tables in metric store \"%s\" with error: %s.", metricStore.Name(), err.Error())
+				continue
+			}
+
+			log.Printf("Finished upload to metric store \"%s\" and optimized tables.", metricStore.Name())
 		}
+	}()
 
-		log.Printf("Finished upload to metric store \"%s\".", metricStore.Name())
-	}
-
-	return "Processed request.", nil
+	return responseMsg, nil
 }
