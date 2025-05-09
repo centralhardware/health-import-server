@@ -10,8 +10,9 @@ type jsonRequest struct {
 }
 
 type jsonData struct {
-	Metrics  []jsonMetric `json:"metrics,omitempty"`
-	Workouts []Workout    `json:"workouts,omitempty"`
+	Metrics     []jsonMetric  `json:"metrics,omitempty"`
+	Workouts    []Workout     `json:"workouts,omitempty"`
+	StateOfMind []StateOfMind `json:"stateOfMind,omitempty"`
 }
 
 type jsonMetric struct {

@@ -12,11 +12,8 @@ import (
 )
 
 type ClickHouseConfig struct {
-	DSN           string `json:"dsn"`
-	Database      string `json:"database"`
-	MetricsTable  string `json:"metrics_table"`
-	WorkoutsTable string `json:"workouts_table"`
-	CreateTables  bool   `json:"create_tables"`
+	DSN      string `json:"dsn"`
+	Database string `json:"database"`
 }
 
 type ClickHouseMetricStore struct {
@@ -24,6 +21,7 @@ type ClickHouseMetricStore struct {
 	database                       string
 	metricsTable                   string
 	workoutsTable                  string
+	stateOfMindTable               string
 	routesTable                    string
 	heartRateDataTable             string
 	heartRateRecoveryTable         string
@@ -46,6 +44,7 @@ func NewClickHouseMetricStore(config ClickHouseConfig) (*ClickHouseMetricStore, 
 		database:                       config.Database,
 		metricsTable:                   "metrics",
 		workoutsTable:                  "workouts",
+		stateOfMindTable:               "state_of_mind",
 		routesTable:                    "workout_routes",
 		heartRateDataTable:             "workout_heart_rate_data",
 		heartRateRecoveryTable:         "workout_heart_rate_recovery",
@@ -53,10 +52,9 @@ func NewClickHouseMetricStore(config ClickHouseConfig) (*ClickHouseMetricStore, 
 		walkingAndRunningDistanceTable: "workout_walking_running_distance",
 	}
 
-	if config.CreateTables {
-		if err := store.createTablesIfNotExist(); err != nil {
-			return nil, fmt.Errorf("failed to create tables: %w", err)
-		}
+	// Always create tables if they don't exist
+	if err := store.createTablesIfNotExist(); err != nil {
+		return nil, fmt.Errorf("failed to create tables: %w", err)
 	}
 
 	return store, nil
@@ -313,6 +311,24 @@ func (store *ClickHouseMetricStore) createTablesIfNotExist() error {
 	`, store.database, store.walkingAndRunningDistanceTable))
 	if err != nil {
 		return fmt.Errorf("failed to create walking and running distance table: %w", err)
+	}
+
+	// Create state of mind table if not exists
+	_, err = store.db.Exec(fmt.Sprintf(`
+		CREATE TABLE IF NOT EXISTS %s.%s (
+			id String,
+			start DateTime,
+			end DateTime,
+			valence Float64,
+			valence_classification LowCardinality(String),
+			kind LowCardinality(String),
+			labels Array(String),
+			associations Array(String),
+			PRIMARY KEY (id)
+  ) ENGINE = ReplacingMergeTree()
+	`, store.database, store.stateOfMindTable))
+	if err != nil {
+		return fmt.Errorf("failed to create state of mind table: %w", err)
 	}
 
 	return nil
@@ -597,6 +613,59 @@ func (store *ClickHouseMetricStore) StoreWorkouts(workouts []request.Workout) er
 	return nil
 }
 
+func (store *ClickHouseMetricStore) StoreStateOfMind(stateOfMind []request.StateOfMind) error {
+	if len(stateOfMind) == 0 {
+		return nil
+	}
+
+	log.Printf("Inserting %d state of mind entries into ClickHouse", len(stateOfMind))
+	ctx := context.Background()
+
+	// Process all state of mind entries and insert them one by one
+	for _, som := range stateOfMind {
+		// Handle nil timestamps
+		var startTime, endTime time.Time
+		if som.Start != nil {
+			startTime = som.Start.ToTime()
+		} else {
+			startTime = time.Now()
+		}
+		if som.End != nil {
+			endTime = som.End.ToTime()
+		} else {
+			endTime = time.Now()
+		}
+
+		// Insert state of mind entry using parameterized query
+		query := fmt.Sprintf(`
+			INSERT INTO %s.%s 
+			(id, start, end, valence, valence_classification, kind, labels, associations) 
+			SETTINGS async_insert=1, wait_for_async_insert=0
+			VALUES 
+			(?, ?, ?, ?, ?, ?, ?, ?)
+		`, store.database, store.stateOfMindTable)
+
+		// Execute the insert with parameters
+		_, err := store.db.ExecContext(ctx, query,
+			som.ID,
+			startTime,
+			endTime,
+			som.Valence,
+			som.ValenceClassification,
+			som.Kind,
+			som.Labels,
+			som.Associations)
+		if err != nil {
+			return fmt.Errorf("failed to insert state of mind entry: %w", err)
+		}
+
+		log.Printf("Inserted state of mind entry: %s (kind: %s, valence: %f) at %s",
+			som.ID, som.Kind, som.Valence, startTime.Format(time.RFC3339))
+	}
+
+	return nil
+}
+
 func (store *ClickHouseMetricStore) OptimizeTables() error {
 	log.Printf("Running OPTIMIZE TABLE FINAL for all tables")
 	ctx := context.Background()
@@ -605,6 +674,7 @@ func (store *ClickHouseMetricStore) OptimizeTables() error {
 	tables := []string{
 		store.metricsTable,
 		store.workoutsTable,
+		store.stateOfMindTable,
 		store.routesTable,
 		store.heartRateDataTable,
 		store.heartRateRecoveryTable,

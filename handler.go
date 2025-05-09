@@ -46,19 +46,21 @@ func (handler *ImportHandler) handle(req *http.Request) (string, error) {
 	populatedMetricsCount := len(populatedMetrics)
 	totalSamples := export.TotalSamples()
 	totalWorkouts := len(export.Workouts)
+	totalStateOfMind := len(export.StateOfMind)
 
-	log.Printf("Total metrics: %d (%d populated) Total samples %d Total workouts: %d\n",
-		totalMetrics, populatedMetricsCount, totalSamples, totalWorkouts)
+	log.Printf("Total metrics: %d (%d populated) Total samples %d Total workouts: %d Total state of mind: %d\n",
+		totalMetrics, populatedMetricsCount, totalSamples, totalWorkouts, totalStateOfMind)
 
 	// Create a detailed response message immediately
-	responseMsg := fmt.Sprintf("Processing request. Received %d metrics (%d populated), %d samples, and %d workouts.",
-		totalMetrics, populatedMetricsCount, totalSamples, totalWorkouts)
+	responseMsg := fmt.Sprintf("Processing request. Received %d metrics (%d populated), %d samples, %d workouts, and %d state of mind entries.",
+		totalMetrics, populatedMetricsCount, totalSamples, totalWorkouts, totalStateOfMind)
 
 	// Process data in the background
 	go func() {
 		// Copy data to avoid race conditions
 		localPopulatedMetrics := populatedMetrics
 		localWorkouts := export.Workouts
+		localStateOfMind := export.StateOfMind
 
 		for _, metricStore := range handler.MetricStores {
 			log.Printf("Starting upload to metric store \"%s\".", metricStore.Name())
@@ -75,6 +77,14 @@ func (handler *ImportHandler) handle(req *http.Request) (string, error) {
 			if len(localWorkouts) > 0 {
 				if err := metricStore.StoreWorkouts(localWorkouts); err != nil {
 					log.Printf("Failed upload workouts to metric store \"%s\" with error: %s.", metricStore.Name(), err.Error())
+					continue
+				}
+			}
+
+			// Store state of mind
+			if len(localStateOfMind) > 0 {
+				if err := metricStore.StoreStateOfMind(localStateOfMind); err != nil {
+					log.Printf("Failed upload state of mind to metric store \"%s\" with error: %s.", metricStore.Name(), err.Error())
 					continue
 				}
 			}
