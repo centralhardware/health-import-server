@@ -5,7 +5,6 @@ import (
 )
 
 type Workout struct {
-	ID                        string         `json:"id,omitempty"`
 	Name                      string         `json:"name,omitempty"`
 	Location                  string         `json:"location,omitempty"`
 	Start                     *Timestamp     `json:"start,omitempty"`
