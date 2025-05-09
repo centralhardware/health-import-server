@@ -9,25 +9,20 @@ type Workout struct {
 	Location                  string         `json:"location,omitempty"`
 	Start                     *Timestamp     `json:"start,omitempty"`
 	End                       *Timestamp     `json:"end,omitempty"`
-	TotalEnergy               QtyUnit        `json:"totalEnergy,omitempty"`
-	ActiveEnergy              QtyUnit        `json:"activeEnergy,omitempty"`
-	AvgHeartRate              QtyUnit        `json:"avgHeartRate,omitempty"`
-	StepCadence               QtyUnit        `json:"stepCadence,omitempty"`
-	Speed                     QtyUnit        `json:"speed,omitempty"`
-	SwimCadence               QtyUnit        `json:"swimCadence,omitempty"`
+	ActiveEnergy              []StepCountLog `json:"activeEnergy,omitempty"`
+	ActiveEnergyBurned        QtyUnit        `json:"activeEnergyBurned,omitempty"`
 	Intensity                 QtyUnit        `json:"intensity,omitempty"` // Fixed typo in json tag
 	Humidity                  QtyUnit        `json:"humidity,omitempty"`
-	TotalSwimmingStrokeCount  QtyUnit        `json:"totalSwimmingStrokeCount,omitempty"`
-	FlightsClimbed            QtyUnit        `json:"flightsClimbed,omitempty"`
-	MaxHeartRate              QtyUnit        `json:"maxHeartRate,omitempty"`
 	Distance                  QtyUnit        `json:"distance,omitempty"`
+	Duration                  float64        `json:"duration,omitempty"`
 	StepCount                 []StepCountLog `json:"stepCount,omitempty"`
 	WalkingAndRunningDistance []StepCountLog `json:"walkingAndRunningDistance,omitempty"`
 	Temperature               QtyUnit        `json:"temperature,omitempty"`
-	Elevation                 Elevation      `json:"elevation,omitempty"`
+	ElevationUp               QtyUnit        `json:"elevationUp,omitempty"`
 	Route                     []GPSLog       `json:"route,omitempty"`
 	HeartRateData             []HeartRateLog `json:"heartRateData,omitempty"`
 	HeartRateRecovery         []HeartRateLog `json:"heartRateRecovery,omitempty"`
+	ID                        string         `json:"id,omitempty"`
 }
 
 type QtyUnit struct {
@@ -68,12 +63,6 @@ type GPSLog struct {
 	CourseAccuracy     float64    `json:"courseAccuracy,omitempty"`
 	Speed              float64    `json:"speed,omitempty"`
 	SpeedAccuracy      float64    `json:"speedAccuracy,omitempty"`
-}
-
-type Elevation struct {
-	Ascent  float64 `json:"ascent"`
-	Descent float64 `json:"descent"`
-	Units   string  `json:"units"`
 }
 
 type StepCountLog struct {

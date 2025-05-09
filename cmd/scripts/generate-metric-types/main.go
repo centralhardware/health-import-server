@@ -8,9 +8,9 @@ import (
 )
 
 func main() {
-	b, err := ioutil.ReadFile("request.json")
+	b, err := ioutil.ReadFile("workouts.json")
 	if err != nil {
-		panic("Failed to read file request.json err = " + err.Error())
+		panic("Failed to read file workouts.json err = " + err.Error())
 	}
 
 	examples, err := parseMetricExamples(b)
