@@ -60,6 +60,7 @@ var metricTypeLookup = map[string]string{
 	"number_of_times_fallen":             MetricTypeQty,
 	"pantothenic_acid":                   MetricTypeQty,
 	"peripheral_perfusion_index":         MetricTypeQty,
+	"physical_effort":                    MetricTypeQty,
 	"polyunsaturated_fat":                MetricTypeQty,
 	"potassium":                          MetricTypeQty,
 	"protein":                            MetricTypeQty,
@@ -79,6 +80,7 @@ var metricTypeLookup = map[string]string{
 	"swimming_distance":                  MetricTypeQty,
 	"swimming_stroke_count":              MetricTypeQty,
 	"thiamin":                            MetricTypeQty,
+	"time_in_daylight":                   MetricTypeQty,
 	"toothbrushing":                      MetricTypeUnknown, // TODO: Implement this...
 	"total_fat":                          MetricTypeQty,
 	"vo2_max":                            MetricTypeQty,
