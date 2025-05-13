@@ -21,6 +21,7 @@ var metricTypeLookup = map[string]string{
 	"body_temperature":                   MetricTypeQty,
 	"calcium":                            MetricTypeQty,
 	"carbohydrates":                      MetricTypeQty,
+	"cardio_recovery":                    MetricTypeQty,
 	"chloride":                           MetricTypeQty,
 	"chromium":                           MetricTypeQty,
 	"copper":                             MetricTypeQty,
@@ -74,8 +75,8 @@ var metricTypeLookup = map[string]string{
 	"six-minute_walking_test_distance":   MetricTypeQty,
 	"sleep_analysis":                     MetricTypeSleep, // TODO: Add missing fields
 	"sodium":                             MetricTypeQty,
-	"stair_speed:_down":                  MetricTypeQty,
-	"stair_speed:_up":                    MetricTypeQty,
+	"stair_speed_down":                   MetricTypeQty,
+	"stair_speed_up":                     MetricTypeQty,
 	"step_count":                         MetricTypeQty,
 	"swimming_distance":                  MetricTypeQty,
 	"swimming_stroke_count":              MetricTypeQty,
