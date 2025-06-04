@@ -11,8 +11,8 @@ import me.centralhardware.healthImportServer.storage.ClickHouseMetricStore
  * Simple Ktor server similar to cmd/server/main.go
  */
 fun main() {
-    val metricStores = loadMetricStores()
-    val handler = ImportHandler(metricStores)
+    val metricStore = loadMetricStore()
+    val handler = ImportHandler(metricStore)
 
     embeddedServer(Netty, port = 8080) {
         routing {
@@ -23,12 +23,12 @@ fun main() {
     }.start(wait = true)
 }
 
-fun loadMetricStores(): List<MetricStore> {
+fun loadMetricStore(): ClickHouseMetricStore {
     val dsn = System.getenv("CLICKHOUSE_DSN")
         ?: error("CLICKHOUSE_DSN must be set")
     val db = System.getenv("CLICKHOUSE_DATABASE")
         ?: error("CLICKHOUSE_DATABASE must be set")
     val store = ClickHouseMetricStore(ClickHouseConfig(dsn, db))
-    return listOf(store)
+    return store
 }
 
