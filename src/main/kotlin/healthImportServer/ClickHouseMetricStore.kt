@@ -5,9 +5,32 @@ import org.flywaydb.core.Flyway
 import java.net.URI
 import java.sql.Connection
 import java.sql.DriverManager
+import java.sql.Timestamp
+import java.time.LocalDate
+import java.time.LocalDateTime
+import java.time.OffsetDateTime
+import java.time.format.DateTimeFormatter
 
 /** Simple ClickHouse implementation of a metric store. */
 class ClickHouseMetricStore(private val config: ClickHouseConfig) : AutoCloseable {
+    private val zonedTsFmt = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss Z")
+    private val localTsFmt = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
+    private val dateFmt = DateTimeFormatter.ofPattern("yyyy-MM-dd")
+
+    private fun parseTs(value: String): Timestamp {
+        return try {
+            val odt = OffsetDateTime.parse(value, zonedTsFmt)
+            Timestamp.from(odt.toInstant())
+        } catch (e: Exception) {
+            try {
+                val ldt = LocalDateTime.parse(value, localTsFmt)
+                Timestamp.valueOf(ldt)
+            } catch (e2: Exception) {
+                val d = LocalDate.parse(value, dateFmt)
+                Timestamp.valueOf(d.atStartOfDay())
+            }
+        }
+    }
     val name: String = "clickhouse"
     private val connection: Connection
 
@@ -41,7 +64,7 @@ class ClickHouseMetricStore(private val config: ClickHouseConfig) : AutoCloseabl
                 for (s in m.data) {
                     val ts = s.date ?: continue
                     val qty = s.qty ?: 0.0
-                    stmt.setString(1, ts)
+                    stmt.setTimestamp(1, parseTs(ts))
                     stmt.setString(2, m.name)
                     stmt.setString(3, m.units)
                     stmt.setDouble(4, qty)
@@ -65,8 +88,8 @@ class ClickHouseMetricStore(private val config: ClickHouseConfig) : AutoCloseabl
                 val end = w.end ?: continue
                 stmt.setString(1, id)
                 stmt.setString(2, w.name ?: "")
-                stmt.setString(3, start)
-                stmt.setString(4, end)
+                stmt.setTimestamp(3, parseTs(start))
+                stmt.setTimestamp(4, parseTs(end))
                 stmt.addBatch()
             }
             stmt.executeBatch()
@@ -86,8 +109,8 @@ class ClickHouseMetricStore(private val config: ClickHouseConfig) : AutoCloseabl
                 val start = s.start ?: continue
                 val end = s.end ?: continue
                 stmt.setString(1, id)
-                stmt.setString(2, start)
-                stmt.setString(3, end)
+                stmt.setTimestamp(2, parseTs(start))
+                stmt.setTimestamp(3, parseTs(end))
                 stmt.setDouble(4, s.valence ?: 0.0)
                 stmt.setString(5, s.valenceClassification ?: "")
                 stmt.setString(6, s.kind ?: "")
@@ -125,8 +148,8 @@ class ClickHouseMetricStore(private val config: ClickHouseConfig) : AutoCloseabl
                     ecgStmt.setString(2, e.classification ?: "")
                     ecgStmt.setString(3, e.source ?: "")
                     ecgStmt.setDouble(4, e.averageHeartRate ?: 0.0)
-                    ecgStmt.setString(5, start)
-                    ecgStmt.setString(6, end)
+                    ecgStmt.setTimestamp(5, parseTs(start))
+                    ecgStmt.setTimestamp(6, parseTs(end))
                     ecgStmt.setInt(7, e.numberOfVoltageMeasurements ?: e.voltageMeasurements.size)
                     ecgStmt.setInt(8, e.samplingFrequency ?: 0)
                     ecgStmt.addBatch()
@@ -137,7 +160,7 @@ class ClickHouseMetricStore(private val config: ClickHouseConfig) : AutoCloseabl
                         val volt = v.voltage ?: continue
                         voltStmt.setString(1, id)
                         voltStmt.setInt(2, idx++)
-                        voltStmt.setString(3, ts)
+                        voltStmt.setTimestamp(3, parseTs(ts))
                         voltStmt.setDouble(4, volt)
                         voltStmt.setString(5, v.units ?: "")
                         voltStmt.addBatch()
