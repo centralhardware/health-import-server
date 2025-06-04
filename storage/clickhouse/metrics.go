@@ -708,8 +708,9 @@ func (store *ClickHouseMetricStore) StoreECG(ecgs []request.ECG) error {
 	ctx := context.Background()
 
 	for _, ecg := range ecgs {
-		id := uuid.New().String()
-
+		// Create a deterministic UUID based on ECG attributes so that
+		// duplicate ECG recordings generate the same id. This allows
+		// ReplacingMergeTree to deduplicate records correctly.
 		var startTime, endTime time.Time
 		if ecg.Start != nil {
 			startTime = ecg.Start.ToTime()
@@ -721,6 +722,16 @@ func (store *ClickHouseMetricStore) StoreECG(ecgs []request.ECG) error {
 		} else {
 			endTime = time.Now()
 		}
+		hashData := fmt.Sprintf("%s|%s|%s|%s|%d|%d|%f",
+			ecg.Classification,
+			ecg.Source,
+			startTime.Format(time.RFC3339Nano),
+			endTime.Format(time.RFC3339Nano),
+			ecg.NumberOfVoltageMeasurements,
+			ecg.SamplingFrequency,
+			ecg.AverageHeartRate,
+		)
+		id := uuid.NewSHA1(uuid.NameSpaceOID, []byte(hashData)).String()
 
 		query := fmt.Sprintf(`
                         INSERT INTO %s.%s
