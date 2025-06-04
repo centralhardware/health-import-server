@@ -38,7 +38,7 @@ class ClickHouseMetricStore(private val config: ClickHouseConfig) : AutoCloseabl
         """.trimIndent()
         connection.prepareStatement(sql).use { stmt ->
             for (m in metrics) {
-                for (s in m.samples) {
+                for (s in m.data) {
                     val ts = s.date ?: continue
                     val qty = s.qty ?: 0.0
                     stmt.setString(1, ts)

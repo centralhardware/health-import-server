@@ -2,7 +2,6 @@ package me.centralhardware.healthImportServer.request
 
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.decodeFromString
 
 @Serializable
 data class ExportWrapper(val data: Export)
@@ -14,15 +13,15 @@ data class Export(
     val stateOfMind: List<StateOfMind> = emptyList(),
     val ecg: List<ECG> = emptyList()
 ) {
-    fun populatedMetrics(): List<Metric> = metrics.filter { it.samples.isNotEmpty() }
-    fun totalSamples(): Int = metrics.sumOf { it.samples.size }
+    fun populatedMetrics(): List<Metric> = metrics.filter { it.data.isNotEmpty() }
+    fun totalSamples(): Int = metrics.sumOf { it.data.size }
 }
 
 @Serializable
 data class Metric(
     val name: String,
     val units: String,
-    val samples: List<Sample> = emptyList()
+    val data: List<Sample> = emptyList()
 )
 
 @Serializable
