@@ -38,11 +38,61 @@ data class Sample(
 )
 
 @Serializable
+data class QtyUnit(
+    val qty: Double? = null,
+    val units: String? = null
+)
+
+@Serializable
+data class StepCountLog(
+    val qty: Double? = null,
+    val source: String? = null,
+    val units: String? = null,
+    val date: String? = null
+)
+
+@Serializable
+data class HeartRateLog(
+    val min: Double? = null,
+    val max: Double? = null,
+    val avg: Double? = null,
+    val units: String? = null,
+    val source: String? = null,
+    val date: String? = null,
+    val qty: Double? = null
+)
+
+@Serializable
+data class GPSLog(
+    val latitude: Double? = null,
+    val longitude: Double? = null,
+    val altitude: Double? = null,
+    val timestamp: String? = null,
+    val course: Double? = null,
+    val verticalAccuracy: Double? = null,
+    val horizontalAccuracy: Double? = null,
+    val courseAccuracy: Double? = null,
+    val speed: Double? = null,
+    val speedAccuracy: Double? = null
+)
+
+@Serializable
 data class Workout(
     val id: String? = null,
     val name: String? = null,
     val start: String? = null,
-    val end: String? = null
+    val end: String? = null,
+    val activeEnergyBurned: QtyUnit? = null,
+    val distance: QtyUnit? = null,
+    val intensity: QtyUnit? = null,
+    val humidity: QtyUnit? = null,
+    val temperature: QtyUnit? = null,
+    val route: List<GPSLog> = emptyList(),
+    val heartRateData: List<HeartRateLog> = emptyList(),
+    val heartRateRecovery: List<HeartRateLog> = emptyList(),
+    val stepCount: List<StepCountLog> = emptyList(),
+    val walkingAndRunningDistance: List<StepCountLog> = emptyList(),
+    val activeEnergy: List<StepCountLog> = emptyList()
 )
 
 @Serializable
