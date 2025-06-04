@@ -6,6 +6,15 @@ Official documentation on the JSON format that the request submodule parses can 
 The server is implemented in Kotlin using Ktor and stores metrics in ClickHouse. ECG voltages include an additional `sample_index` column to avoid deduplication when timestamps repeat and use `DateTime64` to preserve sub-second precision.
 Database schema migrations are managed with Flyway and run automatically when the server starts. Migration scripts live under `src/main/resources/db/migration` and create all eleven tables (`metrics`, `workouts`, `state_of_mind`, `workout_routes`, `workout_heart_rate_data`, `workout_heart_rate_recovery`, `workout_step_count_log`, `workout_walking_running_distance`, `workout_active_energy`, `ecg`, and `ecg_voltage`).
 
+## Flyway and ClickHouse
+Flyway requires a ClickHouse extension in order to recognize `jdbc:clickhouse` URLs. The Gradle build includes this dependency:
+
+```kotlin
+implementation("org.flywaydb:flyway-database-clickhouse:10.18.0")
+```
+
+If this dependency is missing you'll encounter `No database found to handle jdbc:clickhouse` during startup.
+
 ## Configuration
 You can configure the application using environment variables:
 - `CLICKHOUSE_DSN`: The DSN (Data Source Name) for connecting to ClickHouse
