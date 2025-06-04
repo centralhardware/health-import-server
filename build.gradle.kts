@@ -8,13 +8,6 @@ application {
     mainClass.set("me.centralhardware.healthImportServer.ServerKt")
 }
 
-sourceSets {
-    main {
-        kotlin.srcDir("src")
-        resources.srcDir("migration")
-    }
-}
-
 repositories {
     mavenCentral()
 }

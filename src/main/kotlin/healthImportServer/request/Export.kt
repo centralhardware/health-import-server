@@ -21,7 +21,7 @@ data class Export(
 @Serializable
 data class Metric(
     val name: String,
-    val unit: String,
+    val units: String,
     val samples: List<Sample> = emptyList()
 )
 

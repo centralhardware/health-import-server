@@ -43,7 +43,7 @@ class ClickHouseMetricStore(private val config: ClickHouseConfig) : AutoCloseabl
                     val qty = s.qty ?: 0.0
                     stmt.setString(1, ts)
                     stmt.setString(2, m.name)
-                    stmt.setString(3, m.unit)
+                    stmt.setString(3, m.units)
                     stmt.setDouble(4, qty)
                     stmt.addBatch()
                 }
