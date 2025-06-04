@@ -10,6 +10,7 @@ var metricTypeLookup = map[string]string{
 	"apple_exercise_time":                MetricTypeQty,
 	"apple_stand_hour":                   MetricTypeQty,
 	"apple_stand_time":                   MetricTypeQty,
+	"apple_sleeping_wrist_temperature":   MetricTypeQty,
 	"basal_body_temperature":             MetricTypeQty,
 	"basal_energy_burned":                MetricTypeQty,
 	"blood_alcohol_content":              MetricTypeQty,
