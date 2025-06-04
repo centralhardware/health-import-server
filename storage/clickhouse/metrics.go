@@ -331,7 +331,7 @@ func (store *ClickHouseMetricStore) createTablesIfNotExist() error {
 	_, err = store.db.Exec(fmt.Sprintf(`
                 CREATE TABLE IF NOT EXISTS %s.%s (
                         ecg_id UUID,
-                        timestamp DateTime,
+                        timestamp DateTime64(9),
                         voltage Float64,
                         units LowCardinality(String),
                         PRIMARY KEY (ecg_id, timestamp)
@@ -743,6 +743,11 @@ func (store *ClickHouseMetricStore) StoreECG(ecgs []request.ECG) error {
 			return fmt.Errorf("failed to insert ECG: %w", err)
 		}
 
+		log.Printf("Inserted ECG: %s classification=%s start=%s end=%s",
+			id, ecg.Classification,
+			startTime.Format(time.RFC3339),
+			endTime.Format(time.RFC3339))
+
 		for _, vm := range ecg.VoltageMeasurements {
 			var ts time.Time
 			if vm.Date != nil {
@@ -768,6 +773,10 @@ func (store *ClickHouseMetricStore) StoreECG(ecgs []request.ECG) error {
 			if err != nil {
 				return fmt.Errorf("failed to insert ECG voltage: %w", err)
 			}
+
+			log.Printf("Inserted ECG voltage for %s: %v %s at %s",
+				id, vm.Voltage, vm.Units,
+				ts.Format(time.RFC3339Nano))
 		}
 	}
 

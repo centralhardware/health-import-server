@@ -3,7 +3,7 @@ Storage backend for https://www.healthexportapp.com
 
 Official documentation on the JSON format that the request submodule parses can be found here: https://github.com/Lybron/health-auto-export/wiki/API-Export---JSON-Format
 
-Currently supports storing metrics, workouts, state of mind entries and ECG recordings in ClickHouse. More storage backends may be supported in the future.
+Currently supports storing metrics, workouts, state of mind entries and ECG recordings in ClickHouse. Voltage measurements are stored using `DateTime64` to preserve sub-second precision. More storage backends may be supported in the future.
 
 ## Configuration
 You can configure the application using environment variables:
