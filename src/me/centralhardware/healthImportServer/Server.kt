@@ -1,11 +1,11 @@
 package me.centralhardware.healthImportServer
 
-import io.ktor.application.*
-import io.ktor.routing.*
+import io.ktor.server.application.*
+import io.ktor.server.routing.*
 import io.ktor.server.engine.embeddedServer
 import io.ktor.server.netty.Netty
-import com.example.storage.ClickHouseConfig
-import com.example.storage.ClickHouseMetricStore
+import me.centralhardware.healthImportServer.storage.ClickHouseConfig
+import me.centralhardware.healthImportServer.storage.ClickHouseMetricStore
 
 /**
  * Simple Ktor server similar to cmd/server/main.go

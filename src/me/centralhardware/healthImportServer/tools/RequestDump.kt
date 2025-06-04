@@ -1,10 +1,10 @@
 package me.centralhardware.healthImportServer.tools
 
-import io.ktor.application.*
-import io.ktor.request.receiveText
-import io.ktor.response.respondText
-import io.ktor.routing.post
-import io.ktor.routing.routing
+import io.ktor.server.application.*
+import io.ktor.server.request.receiveText
+import io.ktor.server.response.respondText
+import io.ktor.server.routing.post
+import io.ktor.server.routing.routing
 import io.ktor.server.engine.embeddedServer
 import io.ktor.server.netty.Netty
 import java.nio.file.Files

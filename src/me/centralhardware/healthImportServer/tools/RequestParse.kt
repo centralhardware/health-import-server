@@ -1,6 +1,6 @@
 package me.centralhardware.healthImportServer.tools
 
-import com.example.request.RequestParser
+import me.centralhardware.healthImportServer.request.RequestParser
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import java.nio.file.Files
