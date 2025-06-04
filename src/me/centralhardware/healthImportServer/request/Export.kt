@@ -1,4 +1,4 @@
-package com.example.request
+package me.centralhardware.healthImportServer.request
 
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json

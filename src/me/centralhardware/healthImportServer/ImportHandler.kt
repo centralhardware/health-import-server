@@ -1,4 +1,4 @@
-package com.example
+package me.centralhardware.healthImportServer
 
 import io.ktor.application.*
 import io.ktor.request.receiveText

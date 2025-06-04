@@ -1,4 +1,4 @@
-package com.example
+package me.centralhardware.healthImportServer
 
 import com.example.request.Metric
 import com.example.request.Workout

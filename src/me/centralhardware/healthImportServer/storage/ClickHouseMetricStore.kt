@@ -1,4 +1,4 @@
-package com.example.storage
+package me.centralhardware.healthImportServer.storage
 
 import com.example.*
 import org.flywaydb.core.Flyway
