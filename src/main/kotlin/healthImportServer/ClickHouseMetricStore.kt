@@ -86,8 +86,14 @@ class ClickHouseMetricStore(private val config: ClickHouseConfig) : AutoCloseabl
     suspend fun storeWorkouts(workouts: List<Workout>) {
         if (workouts.isEmpty()) return
         val sql = """
-            INSERT INTO ${config.database}.workouts (id, name, start, end)
-            VALUES (?, ?, ?, ?)
+            INSERT INTO ${config.database}.workouts
+            (id, name, start, end,
+             active_energy_qty, active_energy_units,
+             distance_qty, distance_units,
+             intensity_qty, intensity_units,
+             humidity_qty, humidity_units,
+             temperature_qty, temperature_units)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """.trimIndent()
         connection.prepareStatement(sql).use { stmt ->
             var count = 0
@@ -100,12 +106,29 @@ class ClickHouseMetricStore(private val config: ClickHouseConfig) : AutoCloseabl
                 stmt.setString(2, w.name ?: "")
                 stmt.setTimestamp(3, parseTs(start))
                 stmt.setTimestamp(4, parseTs(end))
+                stmt.setDouble(5, w.activeEnergyBurned?.qty ?: 0.0)
+                stmt.setString(6, w.activeEnergyBurned?.units ?: "")
+                stmt.setDouble(7, w.distance?.qty ?: 0.0)
+                stmt.setString(8, w.distance?.units ?: "")
+                stmt.setDouble(9, w.intensity?.qty ?: 0.0)
+                stmt.setString(10, w.intensity?.units ?: "")
+                stmt.setDouble(11, w.humidity?.qty ?: 0.0)
+                stmt.setString(12, w.humidity?.units ?: "")
+                stmt.setDouble(13, w.temperature?.qty ?: 0.0)
+                stmt.setString(14, w.temperature?.units ?: "")
                 stmt.addBatch()
                 count++
             }
             println("Executing workout batch with $count rows")
             stmt.executeBatch()
         }
+
+        storeWorkoutRoutes(workouts)
+        storeWorkoutHeartRateData(workouts)
+        storeWorkoutHeartRateRecovery(workouts)
+        storeWorkoutStepCountLog(workouts)
+        storeWorkoutWalkingRunningDistance(workouts)
+        storeWorkoutActiveEnergy(workouts)
     }
 
     suspend fun storeStateOfMind(stateOfMind: List<StateOfMind>) {
@@ -192,6 +215,193 @@ class ClickHouseMetricStore(private val config: ClickHouseConfig) : AutoCloseabl
                 println("Executing ECG batch with $ecgCount entries and $voltCount voltage rows")
                 ecgStmt.executeBatch()
                 voltStmt.executeBatch()
+            }
+        }
+    }
+
+    private fun storeWorkoutRoutes(workouts: List<Workout>) {
+        val sql = """
+            INSERT INTO ${config.database}.workout_routes
+            (workout_id, timestamp, lat, lon, altitude, course, vertical_accuracy,
+             horizontal_accuracy, course_accuracy, speed, speed_accuracy)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """.trimIndent()
+        connection.prepareStatement(sql).use { stmt ->
+            var count = 0
+            for (w in workouts) {
+                val id = w.id ?: continue
+                val start = w.start ?: continue
+                for (r in w.route) {
+                    val ts = r.timestamp ?: start
+                    stmt.setString(1, id)
+                    stmt.setTimestamp(2, parseTs(ts))
+                    stmt.setDouble(3, r.latitude ?: 0.0)
+                    stmt.setDouble(4, r.longitude ?: 0.0)
+                    stmt.setDouble(5, r.altitude ?: 0.0)
+                    stmt.setDouble(6, r.course ?: 0.0)
+                    stmt.setDouble(7, r.verticalAccuracy ?: 0.0)
+                    stmt.setDouble(8, r.horizontalAccuracy ?: 0.0)
+                    stmt.setDouble(9, r.courseAccuracy ?: 0.0)
+                    stmt.setDouble(10, r.speed ?: 0.0)
+                    stmt.setDouble(11, r.speedAccuracy ?: 0.0)
+                    stmt.addBatch()
+                    count++
+                }
+            }
+            if (count > 0) {
+                println("Executing workout route batch with $count rows")
+                stmt.executeBatch()
+            }
+        }
+    }
+
+    private fun storeWorkoutHeartRateData(workouts: List<Workout>) {
+        val sql = """
+            INSERT INTO ${config.database}.workout_heart_rate_data
+            (workout_id, timestamp, qty, min, max, avg, units, source)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """.trimIndent()
+        connection.prepareStatement(sql).use { stmt ->
+            var count = 0
+            for (w in workouts) {
+                val id = w.id ?: continue
+                val start = w.start ?: continue
+                for (h in w.heartRateData) {
+                    val ts = h.date ?: start
+                    stmt.setString(1, id)
+                    stmt.setTimestamp(2, parseTs(ts))
+                    stmt.setDouble(3, h.qty ?: 0.0)
+                    stmt.setDouble(4, h.min ?: 0.0)
+                    stmt.setDouble(5, h.max ?: 0.0)
+                    stmt.setDouble(6, h.avg ?: 0.0)
+                    stmt.setString(7, h.units ?: "")
+                    stmt.setString(8, h.source ?: "")
+                    stmt.addBatch()
+                    count++
+                }
+            }
+            if (count > 0) {
+                println("Executing workout heart rate data batch with $count rows")
+                stmt.executeBatch()
+            }
+        }
+    }
+
+    private fun storeWorkoutHeartRateRecovery(workouts: List<Workout>) {
+        val sql = """
+            INSERT INTO ${config.database}.workout_heart_rate_recovery
+            (workout_id, timestamp, qty, min, max, avg, units, source)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """.trimIndent()
+        connection.prepareStatement(sql).use { stmt ->
+            var count = 0
+            for (w in workouts) {
+                val id = w.id ?: continue
+                val start = w.start ?: continue
+                for (h in w.heartRateRecovery) {
+                    val ts = h.date ?: start
+                    stmt.setString(1, id)
+                    stmt.setTimestamp(2, parseTs(ts))
+                    stmt.setDouble(3, h.qty ?: 0.0)
+                    stmt.setDouble(4, h.min ?: 0.0)
+                    stmt.setDouble(5, h.max ?: 0.0)
+                    stmt.setDouble(6, h.avg ?: 0.0)
+                    stmt.setString(7, h.units ?: "")
+                    stmt.setString(8, h.source ?: "")
+                    stmt.addBatch()
+                    count++
+                }
+            }
+            if (count > 0) {
+                println("Executing workout heart rate recovery batch with $count rows")
+                stmt.executeBatch()
+            }
+        }
+    }
+
+    private fun storeWorkoutStepCountLog(workouts: List<Workout>) {
+        val sql = """
+            INSERT INTO ${config.database}.workout_step_count_log
+            (workout_id, timestamp, qty, units, source)
+            VALUES (?, ?, ?, ?, ?)
+        """.trimIndent()
+        connection.prepareStatement(sql).use { stmt ->
+            var count = 0
+            for (w in workouts) {
+                val id = w.id ?: continue
+                val start = w.start ?: continue
+                for (s in w.stepCount) {
+                    val ts = s.date ?: start
+                    stmt.setString(1, id)
+                    stmt.setTimestamp(2, parseTs(ts))
+                    stmt.setDouble(3, s.qty ?: 0.0)
+                    stmt.setString(4, s.units ?: "")
+                    stmt.setString(5, s.source ?: "")
+                    stmt.addBatch()
+                    count++
+                }
+            }
+            if (count > 0) {
+                println("Executing workout step count batch with $count rows")
+                stmt.executeBatch()
+            }
+        }
+    }
+
+    private fun storeWorkoutWalkingRunningDistance(workouts: List<Workout>) {
+        val sql = """
+            INSERT INTO ${config.database}.workout_walking_running_distance
+            (workout_id, timestamp, qty, units, source)
+            VALUES (?, ?, ?, ?, ?)
+        """.trimIndent()
+        connection.prepareStatement(sql).use { stmt ->
+            var count = 0
+            for (w in workouts) {
+                val id = w.id ?: continue
+                val start = w.start ?: continue
+                for (s in w.walkingAndRunningDistance) {
+                    val ts = s.date ?: start
+                    stmt.setString(1, id)
+                    stmt.setTimestamp(2, parseTs(ts))
+                    stmt.setDouble(3, s.qty ?: 0.0)
+                    stmt.setString(4, s.units ?: "")
+                    stmt.setString(5, s.source ?: "")
+                    stmt.addBatch()
+                    count++
+                }
+            }
+            if (count > 0) {
+                println("Executing workout walking/running distance batch with $count rows")
+                stmt.executeBatch()
+            }
+        }
+    }
+
+    private fun storeWorkoutActiveEnergy(workouts: List<Workout>) {
+        val sql = """
+            INSERT INTO ${config.database}.workout_active_energy
+            (workout_id, timestamp, qty, units, source)
+            VALUES (?, ?, ?, ?, ?)
+        """.trimIndent()
+        connection.prepareStatement(sql).use { stmt ->
+            var count = 0
+            for (w in workouts) {
+                val id = w.id ?: continue
+                val start = w.start ?: continue
+                for (s in w.activeEnergy) {
+                    val ts = s.date ?: start
+                    stmt.setString(1, id)
+                    stmt.setTimestamp(2, parseTs(ts))
+                    stmt.setDouble(3, s.qty ?: 0.0)
+                    stmt.setString(4, s.units ?: "")
+                    stmt.setString(5, s.source ?: "")
+                    stmt.addBatch()
+                    count++
+                }
+            }
+            if (count > 0) {
+                println("Executing workout active energy batch with $count rows")
+                stmt.executeBatch()
             }
         }
     }
