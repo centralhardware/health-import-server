@@ -13,6 +13,7 @@ type jsonData struct {
 	Metrics     []jsonMetric  `json:"metrics,omitempty"`
 	Workouts    []Workout     `json:"workouts,omitempty"`
 	StateOfMind []StateOfMind `json:"stateOfMind,omitempty"`
+	ECG         []ECG         `json:"ecg,omitempty"`
 }
 
 type jsonMetric struct {

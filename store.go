@@ -10,6 +10,7 @@ type MetricStore interface {
 	Store(metrics []request.Metric) error
 	StoreWorkouts(workouts []request.Workout) error
 	StoreStateOfMind(stateOfMind []request.StateOfMind) error
+	StoreECG(ecg []request.ECG) error
 	OptimizeTables() error
 	Close() error
 }

@@ -47,13 +47,14 @@ func (handler *ImportHandler) handle(req *http.Request) (string, error) {
 	totalSamples := export.TotalSamples()
 	totalWorkouts := len(export.Workouts)
 	totalStateOfMind := len(export.StateOfMind)
+	totalECG := len(export.ECG)
 
-	log.Printf("Total metrics: %d (%d populated) Total samples %d Total workouts: %d Total state of mind: %d\n",
-		totalMetrics, populatedMetricsCount, totalSamples, totalWorkouts, totalStateOfMind)
+	log.Printf("Total metrics: %d (%d populated) Total samples %d Total workouts: %d Total state of mind: %d Total ECG: %d\n",
+		totalMetrics, populatedMetricsCount, totalSamples, totalWorkouts, totalStateOfMind, totalECG)
 
 	// Create a detailed response message immediately
-	responseMsg := fmt.Sprintf("Processing request. Received %d metrics (%d populated), %d samples, %d workouts, and %d state of mind entries.",
-		totalMetrics, populatedMetricsCount, totalSamples, totalWorkouts, totalStateOfMind)
+	responseMsg := fmt.Sprintf("Processing request. Received %d metrics (%d populated), %d samples, %d workouts, %d state of mind entries and %d ECG recordings.",
+		totalMetrics, populatedMetricsCount, totalSamples, totalWorkouts, totalStateOfMind, totalECG)
 
 	// Process data in the background
 	go func() {
@@ -61,6 +62,7 @@ func (handler *ImportHandler) handle(req *http.Request) (string, error) {
 		localPopulatedMetrics := populatedMetrics
 		localWorkouts := export.Workouts
 		localStateOfMind := export.StateOfMind
+		localECG := export.ECG
 
 		for _, metricStore := range handler.MetricStores {
 			log.Printf("Starting upload to metric store \"%s\".", metricStore.Name())
@@ -69,6 +71,14 @@ func (handler *ImportHandler) handle(req *http.Request) (string, error) {
 			if len(localPopulatedMetrics) > 0 {
 				if err := metricStore.Store(localPopulatedMetrics); err != nil {
 					log.Printf("Failed upload metrics to metric store \"%s\" with error: %s.", metricStore.Name(), err.Error())
+					continue
+				}
+			}
+
+			// Store ECG recordings
+			if len(localECG) > 0 {
+				if err := metricStore.StoreECG(localECG); err != nil {
+					log.Printf("Failed upload ECG to metric store \"%s\" with error: %s.", metricStore.Name(), err.Error())
 					continue
 				}
 			}
