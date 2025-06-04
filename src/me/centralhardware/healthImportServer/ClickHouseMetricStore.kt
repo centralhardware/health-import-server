@@ -7,7 +7,7 @@ import java.sql.Connection
 import java.sql.DriverManager
 
 /** Simple ClickHouse implementation of [MetricStore]. */
-class ClickHouseMetricStore(private val config: ClickHouseConfig) : MetricStore {
+class ClickHouseMetricStore(private val config: ClickHouseConfig) {
     override val name: String = "clickhouse"
     private val connection: Connection
 
