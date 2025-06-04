@@ -22,7 +22,7 @@ class ClickHouseMetricStore(private val config: ClickHouseConfig) : AutoCloseabl
 
         Flyway.configure()
             .dataSource(jdbcUrl, user, password)
-            .locations("classpath:db/migration")
+            .locations("classpath:migration")
             .placeholders(mapOf("database" to config.database))
             .load()
             .migrate()
