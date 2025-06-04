@@ -1,15 +1,14 @@
 package me.centralhardware.healthImportServer.storage
 
-import me.centralhardware.healthImportServer.MetricStore
 import me.centralhardware.healthImportServer.request.*
 import org.flywaydb.core.Flyway
 import java.net.URI
 import java.sql.Connection
 import java.sql.DriverManager
 
-/** Simple ClickHouse implementation of [MetricStore]. */
-class ClickHouseMetricStore(private val config: ClickHouseConfig) : MetricStore {
-    override val name: String = "clickhouse"
+/** Simple ClickHouse implementation of a metric store. */
+class ClickHouseMetricStore(private val config: ClickHouseConfig) : AutoCloseable {
+    val name: String = "clickhouse"
     private val connection: Connection
 
     init {
@@ -31,7 +30,7 @@ class ClickHouseMetricStore(private val config: ClickHouseConfig) : MetricStore 
         connection = DriverManager.getConnection(jdbcUrl)
     }
 
-    override suspend fun store(metrics: List<Metric>) {
+    suspend fun store(metrics: List<Metric>) {
         if (metrics.isEmpty()) return
         val sql = """
             INSERT INTO ${'$'}{config.database}.metrics (timestamp, metric_name, metric_unit, qty)
@@ -53,7 +52,7 @@ class ClickHouseMetricStore(private val config: ClickHouseConfig) : MetricStore 
         }
     }
 
-    override suspend fun storeWorkouts(workouts: List<Workout>) {
+    suspend fun storeWorkouts(workouts: List<Workout>) {
         if (workouts.isEmpty()) return
         val sql = """
             INSERT INTO ${'$'}{config.database}.workouts (id, name, start, end)
@@ -74,7 +73,7 @@ class ClickHouseMetricStore(private val config: ClickHouseConfig) : MetricStore 
         }
     }
 
-    override suspend fun storeStateOfMind(stateOfMind: List<StateOfMind>) {
+    suspend fun storeStateOfMind(stateOfMind: List<StateOfMind>) {
         if (stateOfMind.isEmpty()) return
         val sql = """
             INSERT INTO ${'$'}{config.database}.state_of_mind
@@ -102,7 +101,7 @@ class ClickHouseMetricStore(private val config: ClickHouseConfig) : MetricStore 
         }
     }
 
-    override suspend fun storeEcg(ecg: List<ECG>) {
+    suspend fun storeEcg(ecg: List<ECG>) {
         if (ecg.isEmpty()) return
         val sql = """
             INSERT INTO ${'$'}{config.database}.ecg
@@ -150,7 +149,7 @@ class ClickHouseMetricStore(private val config: ClickHouseConfig) : MetricStore 
         }
     }
 
-    override suspend fun optimizeTables() {
+    suspend fun optimizeTables() {
         val tables = listOf(
             "metrics",
             "workouts",

@@ -4,6 +4,7 @@ import io.ktor.server.application.*
 import io.ktor.server.request.receiveText
 import io.ktor.server.response.respondText
 import me.centralhardware.healthImportServer.request.RequestParser
+import me.centralhardware.healthImportServer.storage.ClickHouseMetricStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -11,7 +12,7 @@ import kotlinx.coroutines.launch
 /**
  * Kotlin implementation of the import handler found in handler.go
  */
-class ImportHandler(private val metricStores: List<MetricStore>) {
+class ImportHandler(private val metricStore: ClickHouseMetricStore) {
 
     suspend fun handle(call: ApplicationCall) {
         val body = call.receiveText()
@@ -30,17 +31,15 @@ class ImportHandler(private val metricStores: List<MetricStore>) {
             val localStateOfMind = export.stateOfMind
             val localEcg = export.ecg
 
-            for (store in metricStores) {
-                println("Starting upload to metric store \"${store.name}\".")
+            println("Starting upload to metric store \"${metricStore.name}\".")
 
-                if (localMetrics.isNotEmpty()) store.store(localMetrics)
-                if (localEcg.isNotEmpty()) store.storeEcg(localEcg)
-                if (localWorkouts.isNotEmpty()) store.storeWorkouts(localWorkouts)
-                if (localStateOfMind.isNotEmpty()) store.storeStateOfMind(localStateOfMind)
+            if (localMetrics.isNotEmpty()) metricStore.store(localMetrics)
+            if (localEcg.isNotEmpty()) metricStore.storeEcg(localEcg)
+            if (localWorkouts.isNotEmpty()) metricStore.storeWorkouts(localWorkouts)
+            if (localStateOfMind.isNotEmpty()) metricStore.storeStateOfMind(localStateOfMind)
 
-                store.optimizeTables()
-                println("Finished upload to metric store \"${store.name}\" and optimized tables.")
-            }
+            metricStore.optimizeTables()
+            println("Finished upload to metric store \"${metricStore.name}\" and optimized tables.")
         }
     }
 }
