@@ -33,10 +33,24 @@ class ImportHandler(private val metricStore: ClickHouseMetricStore) {
 
             println("Starting upload to metric store \"${metricStore.name}\".")
 
-            if (localMetrics.isNotEmpty()) metricStore.store(localMetrics)
-            if (localEcg.isNotEmpty()) metricStore.storeEcg(localEcg)
-            if (localWorkouts.isNotEmpty()) metricStore.storeWorkouts(localWorkouts)
-            if (localStateOfMind.isNotEmpty()) metricStore.storeStateOfMind(localStateOfMind)
+            if (localMetrics.isNotEmpty()) {
+                metricStore.store(localMetrics)
+                val samples = localMetrics.sumOf { it.data.size }
+                println("Saved ${localMetrics.size} metrics with $samples samples")
+            }
+            if (localEcg.isNotEmpty()) {
+                metricStore.storeEcg(localEcg)
+                val voltages = localEcg.sumOf { it.voltageMeasurements.size }
+                println("Saved ${localEcg.size} ECG entries with $voltages voltage measurements")
+            }
+            if (localWorkouts.isNotEmpty()) {
+                metricStore.storeWorkouts(localWorkouts)
+                println("Saved ${localWorkouts.size} workouts")
+            }
+            if (localStateOfMind.isNotEmpty()) {
+                metricStore.storeStateOfMind(localStateOfMind)
+                println("Saved ${localStateOfMind.size} state of mind entries")
+            }
 
             metricStore.optimizeTables()
             println("Finished upload to metric store \"${metricStore.name}\" and optimized tables.")
