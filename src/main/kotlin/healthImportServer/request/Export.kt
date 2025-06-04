@@ -71,7 +71,7 @@ data class ECG(
 
 @Serializable
 data class ECGVoltage(
-    val date: String? = null,
+    val date: Double? = null,
     val voltage: Double? = null,
     val units: String? = null
 )

@@ -19,15 +19,19 @@ class ClickHouseMetricStore(private val config: ClickHouseConfig) : AutoCloseabl
 
     private fun parseTs(value: String): Timestamp {
         return try {
-            val odt = OffsetDateTime.parse(value, zonedTsFmt)
-            Timestamp.from(odt.toInstant())
-        } catch (e: Exception) {
+            Timestamp.from(java.time.Instant.parse(value))
+        } catch (_: Exception) {
             try {
-                val ldt = LocalDateTime.parse(value, localTsFmt)
-                Timestamp.valueOf(ldt)
-            } catch (e2: Exception) {
-                val d = LocalDate.parse(value, dateFmt)
-                Timestamp.valueOf(d.atStartOfDay())
+                val odt = OffsetDateTime.parse(value, zonedTsFmt)
+                Timestamp.from(odt.toInstant())
+            } catch (_: Exception) {
+                try {
+                    val ldt = LocalDateTime.parse(value, localTsFmt)
+                    Timestamp.valueOf(ldt)
+                } catch (_: Exception) {
+                    val d = LocalDate.parse(value, dateFmt)
+                    Timestamp.valueOf(d.atStartOfDay())
+                }
             }
         }
     }
@@ -177,7 +181,8 @@ class ClickHouseMetricStore(private val config: ClickHouseConfig) : AutoCloseabl
                         println("Batching ECG voltage for $id: $v")
                         voltStmt.setString(1, id)
                         voltStmt.setInt(2, idx++)
-                        voltStmt.setTimestamp(3, parseTs(ts))
+                        val instant = java.time.Instant.ofEpochMilli((ts * 1000).toLong())
+                        voltStmt.setTimestamp(3, java.sql.Timestamp.from(instant))
                         voltStmt.setDouble(4, volt)
                         voltStmt.setString(5, v.units ?: "")
                         voltStmt.addBatch()
