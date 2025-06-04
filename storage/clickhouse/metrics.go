@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	_ "github.com/ClickHouse/clickhouse-go/v2"
+	"github.com/google/uuid"
 	"github.com/joeecarter/health-import-server/request"
 	"log"
 
@@ -28,6 +29,8 @@ type ClickHouseMetricStore struct {
 	stepCountLogTable              string
 	walkingAndRunningDistanceTable string
 	activeEnergyTable              string
+	ecgTable                       string
+	ecgVoltageTable                string
 }
 
 func NewClickHouseMetricStore(config ClickHouseConfig) (*ClickHouseMetricStore, error) {
@@ -52,6 +55,8 @@ func NewClickHouseMetricStore(config ClickHouseConfig) (*ClickHouseMetricStore, 
 		stepCountLogTable:              "workout_step_count_log",
 		walkingAndRunningDistanceTable: "workout_walking_running_distance",
 		activeEnergyTable:              "workout_active_energy",
+		ecgTable:                       "ecg",
+		ecgVoltageTable:                "ecg_voltage",
 	}
 
 	// Always create tables if they don't exist
@@ -291,17 +296,50 @@ func (store *ClickHouseMetricStore) createTablesIfNotExist() error {
 
 	// Create active energy table if not exists
 	_, err = store.db.Exec(fmt.Sprintf(`
-		CREATE TABLE IF NOT EXISTS %s.%s (
-			workout_id UUID,
-			timestamp DateTime,
-			qty Float64,
-			units LowCardinality(String),
-			source LowCardinality(String),
-			PRIMARY KEY (workout_id, timestamp)
+                CREATE TABLE IF NOT EXISTS %s.%s (
+                        workout_id UUID,
+                        timestamp DateTime,
+                        qty Float64,
+                        units LowCardinality(String),
+                        source LowCardinality(String),
+                        PRIMARY KEY (workout_id, timestamp)
   ) ENGINE = ReplacingMergeTree()
-	`, store.database, store.activeEnergyTable))
+        `, store.database, store.activeEnergyTable))
 	if err != nil {
 		return fmt.Errorf("failed to create active energy table: %w", err)
+	}
+
+	// Create ECG table if not exists
+	_, err = store.db.Exec(fmt.Sprintf(`
+                CREATE TABLE IF NOT EXISTS %s.%s (
+                        id UUID,
+                        classification LowCardinality(String),
+                        source LowCardinality(String),
+                        average_heart_rate Float64,
+                        start DateTime,
+                        end DateTime,
+                        number_of_voltage_measurements UInt32,
+                        sampling_frequency UInt32,
+                        PRIMARY KEY (id)
+  ) ENGINE = ReplacingMergeTree()
+        `, store.database, store.ecgTable))
+	if err != nil {
+		return fmt.Errorf("failed to create ECG table: %w", err)
+	}
+
+	// Create ECG voltage measurements table if not exists
+	_, err = store.db.Exec(fmt.Sprintf(`
+                CREATE TABLE IF NOT EXISTS %s.%s (
+                        ecg_id UUID,
+                        sample_index UInt32,
+                        timestamp DateTime64(9),
+                        voltage Float64,
+                        units LowCardinality(String),
+                        PRIMARY KEY (ecg_id, sample_index)
+  ) ENGINE = ReplacingMergeTree()
+        `, store.database, store.ecgVoltageTable))
+	if err != nil {
+		return fmt.Errorf("failed to create ECG voltage table: %w", err)
 	}
 
 	// Create state of mind table if not exists
@@ -661,6 +699,95 @@ func (store *ClickHouseMetricStore) StoreStateOfMind(stateOfMind []request.State
 	return nil
 }
 
+func (store *ClickHouseMetricStore) StoreECG(ecgs []request.ECG) error {
+	if len(ecgs) == 0 {
+		return nil
+	}
+
+	log.Printf("Inserting %d ECG recordings into ClickHouse", len(ecgs))
+	ctx := context.Background()
+
+	for _, ecg := range ecgs {
+		id := uuid.New().String()
+
+		var startTime, endTime time.Time
+		if ecg.Start != nil {
+			startTime = ecg.Start.ToTime()
+		} else {
+			startTime = time.Now()
+		}
+		if ecg.End != nil {
+			endTime = ecg.End.ToTime()
+		} else {
+			endTime = time.Now()
+		}
+
+		query := fmt.Sprintf(`
+                        INSERT INTO %s.%s
+                        (id, classification, source, average_heart_rate, start, end, number_of_voltage_measurements, sampling_frequency)
+                        SETTINGS async_insert=1, wait_for_async_insert=0
+                        VALUES
+                        (?, ?, ?, ?, ?, ?, ?, ?)
+               `, store.database, store.ecgTable)
+
+		_, err := store.db.ExecContext(ctx, query,
+			id,
+			ecg.Classification,
+			ecg.Source,
+			ecg.AverageHeartRate,
+			startTime,
+			endTime,
+			ecg.NumberOfVoltageMeasurements,
+			ecg.SamplingFrequency,
+		)
+		if err != nil {
+			return fmt.Errorf("failed to insert ECG: %w", err)
+		}
+
+		log.Printf("Inserted ECG: %s classification=%s start=%s end=%s",
+			id, ecg.Classification,
+			startTime.Format(time.RFC3339),
+			endTime.Format(time.RFC3339))
+
+		for i, vm := range ecg.VoltageMeasurements {
+			var ts time.Time
+			if vm.Date != nil {
+				ts = vm.Date.ToTime()
+			} else if ecg.SamplingFrequency > 0 {
+				interval := time.Second / time.Duration(ecg.SamplingFrequency)
+				ts = startTime.Add(time.Duration(i) * interval)
+			} else {
+				ts = startTime
+			}
+
+			voltQuery := fmt.Sprintf(`
+                                INSERT INTO %s.%s
+                                (ecg_id, sample_index, timestamp, voltage, units)
+                                SETTINGS async_insert=1, wait_for_async_insert=0
+                                VALUES
+                                (?, ?, ?, ?, ?)
+                       `, store.database, store.ecgVoltageTable)
+
+			_, err := store.db.ExecContext(ctx, voltQuery,
+				id,
+				uint32(i),
+				ts,
+				vm.Voltage,
+				vm.Units,
+			)
+			if err != nil {
+				return fmt.Errorf("failed to insert ECG voltage: %w", err)
+			}
+
+			log.Printf("Inserted ECG voltage for %s index=%d: %v %s at %s",
+				id, i, vm.Voltage, vm.Units,
+				ts.Format(time.RFC3339Nano))
+		}
+	}
+
+	return nil
+}
+
 func (store *ClickHouseMetricStore) OptimizeTables() error {
 	log.Printf("Running OPTIMIZE TABLE FINAL for all tables")
 	ctx := context.Background()
@@ -676,6 +803,8 @@ func (store *ClickHouseMetricStore) OptimizeTables() error {
 		store.stepCountLogTable,
 		store.walkingAndRunningDistanceTable,
 		store.activeEnergyTable,
+		store.ecgTable,
+		store.ecgVoltageTable,
 	}
 
 	// Run OPTIMIZE TABLE FINAL for each table

@@ -11,6 +11,7 @@ type APIExportRequest struct {
 	Metrics          []Metric      `json:"metrics"`
 	Workouts         []Workout     `json:"workouts"`
 	StateOfMind      []StateOfMind `json:"stateOfMind"`
+	ECG              []ECG         `json:"ecg"`
 	populatedMetrics []Metric
 }
 
@@ -79,6 +80,7 @@ func (p *Parser) Parse() (*APIExportRequest, error) {
 		Metrics:     metrics,
 		Workouts:    j.Data.Workouts,
 		StateOfMind: j.Data.StateOfMind,
+		ECG:         j.Data.ECG,
 	}, nil
 }
 
