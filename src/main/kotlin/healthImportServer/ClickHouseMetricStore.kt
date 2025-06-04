@@ -60,17 +60,21 @@ class ClickHouseMetricStore(private val config: ClickHouseConfig) : AutoCloseabl
             VALUES (?, ?, ?, ?)
         """.trimIndent()
         connection.prepareStatement(sql).use { stmt ->
+            var count = 0
             for (m in metrics) {
                 for (s in m.data) {
                     val ts = s.date ?: continue
                     val qty = s.qty ?: 0.0
+                    println("Batching metric: ${m.name} (${m.units}) $ts -> $qty")
                     stmt.setTimestamp(1, parseTs(ts))
                     stmt.setString(2, m.name)
                     stmt.setString(3, m.units)
                     stmt.setDouble(4, qty)
                     stmt.addBatch()
+                    count++
                 }
             }
+            println("Executing metric batch with $count rows")
             stmt.executeBatch()
         }
     }
@@ -82,16 +86,20 @@ class ClickHouseMetricStore(private val config: ClickHouseConfig) : AutoCloseabl
             VALUES (?, ?, ?, ?)
         """.trimIndent()
         connection.prepareStatement(sql).use { stmt ->
+            var count = 0
             for (w in workouts) {
                 val id = w.id ?: continue
                 val start = w.start ?: continue
                 val end = w.end ?: continue
+                println("Batching workout: $w")
                 stmt.setString(1, id)
                 stmt.setString(2, w.name ?: "")
                 stmt.setTimestamp(3, parseTs(start))
                 stmt.setTimestamp(4, parseTs(end))
                 stmt.addBatch()
+                count++
             }
+            println("Executing workout batch with $count rows")
             stmt.executeBatch()
         }
     }
@@ -104,10 +112,12 @@ class ClickHouseMetricStore(private val config: ClickHouseConfig) : AutoCloseabl
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         """.trimIndent()
         connection.prepareStatement(sql).use { stmt ->
+            var count = 0
             for (s in stateOfMind) {
                 val id = s.id ?: continue
                 val start = s.start ?: continue
                 val end = s.end ?: continue
+                println("Batching state of mind: $s")
                 stmt.setString(1, id)
                 stmt.setTimestamp(2, parseTs(start))
                 stmt.setTimestamp(3, parseTs(end))
@@ -119,7 +129,9 @@ class ClickHouseMetricStore(private val config: ClickHouseConfig) : AutoCloseabl
                 stmt.setString(7, labels)
                 stmt.setString(8, assoc)
                 stmt.addBatch()
+                count++
             }
+            println("Executing state of mind batch with $count rows")
             stmt.executeBatch()
         }
     }
@@ -139,11 +151,14 @@ class ClickHouseMetricStore(private val config: ClickHouseConfig) : AutoCloseabl
 
         connection.prepareStatement(sql).use { ecgStmt ->
             connection.prepareStatement(voltageSql).use { voltStmt ->
+                var ecgCount = 0
+                var voltCount = 0
                 for (e in ecg) {
                     val start = e.start ?: continue
                     val end = e.end ?: continue
                     val id = java.util.UUID.randomUUID().toString()
 
+                    println("Batching ECG: $e as id $id")
                     ecgStmt.setString(1, id)
                     ecgStmt.setString(2, e.classification ?: "")
                     ecgStmt.setString(3, e.source ?: "")
@@ -153,19 +168,23 @@ class ClickHouseMetricStore(private val config: ClickHouseConfig) : AutoCloseabl
                     ecgStmt.setInt(7, e.numberOfVoltageMeasurements ?: e.voltageMeasurements.size)
                     ecgStmt.setInt(8, e.samplingFrequency ?: 0)
                     ecgStmt.addBatch()
+                    ecgCount++
 
                     var idx = 0
                     for (v in e.voltageMeasurements) {
                         val ts = v.date ?: continue
                         val volt = v.voltage ?: continue
+                        println("Batching ECG voltage for $id: $v")
                         voltStmt.setString(1, id)
                         voltStmt.setInt(2, idx++)
                         voltStmt.setTimestamp(3, parseTs(ts))
                         voltStmt.setDouble(4, volt)
                         voltStmt.setString(5, v.units ?: "")
                         voltStmt.addBatch()
+                        voltCount++
                     }
                 }
+                println("Executing ECG batch with $ecgCount entries and $voltCount voltage rows")
                 ecgStmt.executeBatch()
                 voltStmt.executeBatch()
             }
