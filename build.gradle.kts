@@ -27,6 +27,7 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.0")
     implementation("com.clickhouse:clickhouse-jdbc:0.8.6")
     implementation("org.flywaydb:flyway-core:10.14.0")
+    implementation("org.flywaydb:flyway-database-clickhouse:10.18.0")
     implementation("org.slf4j:slf4j-simple:2.0.12")
     testImplementation(kotlin("test"))
 }
