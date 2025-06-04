@@ -1,9 +1,9 @@
 package me.centralhardware.healthImportServer
 
-import io.ktor.application.*
-import io.ktor.request.receiveText
-import io.ktor.response.respondText
-import com.example.request.RequestParser
+import io.ktor.server.application.*
+import io.ktor.server.request.receiveText
+import io.ktor.server.response.respondText
+import me.centralhardware.healthImportServer.request.RequestParser
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch

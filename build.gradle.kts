@@ -5,7 +5,14 @@ plugins {
 }
 
 application {
-    mainClass.set("com.example.ServerKt")
+    mainClass.set("me.centralhardware.healthImportServer.ServerKt")
+}
+
+sourceSets {
+    main {
+        kotlin.srcDir("src")
+        resources.srcDir("migration")
+    }
 }
 
 repositories {
