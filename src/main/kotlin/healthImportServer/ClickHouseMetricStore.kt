@@ -33,7 +33,7 @@ class ClickHouseMetricStore(private val config: ClickHouseConfig) : AutoCloseabl
     suspend fun store(metrics: List<Metric>) {
         if (metrics.isEmpty()) return
         val sql = """
-            INSERT INTO ${'$'}{config.database}.metrics (timestamp, metric_name, metric_unit, qty)
+            INSERT INTO ${config.database}.metrics (timestamp, metric_name, metric_unit, qty)
             VALUES (?, ?, ?, ?)
         """.trimIndent()
         connection.prepareStatement(sql).use { stmt ->
@@ -55,7 +55,7 @@ class ClickHouseMetricStore(private val config: ClickHouseConfig) : AutoCloseabl
     suspend fun storeWorkouts(workouts: List<Workout>) {
         if (workouts.isEmpty()) return
         val sql = """
-            INSERT INTO ${'$'}{config.database}.workouts (id, name, start, end)
+            INSERT INTO ${config.database}.workouts (id, name, start, end)
             VALUES (?, ?, ?, ?)
         """.trimIndent()
         connection.prepareStatement(sql).use { stmt ->
@@ -76,7 +76,7 @@ class ClickHouseMetricStore(private val config: ClickHouseConfig) : AutoCloseabl
     suspend fun storeStateOfMind(stateOfMind: List<StateOfMind>) {
         if (stateOfMind.isEmpty()) return
         val sql = """
-            INSERT INTO ${'$'}{config.database}.state_of_mind
+            INSERT INTO ${config.database}.state_of_mind
             (id, start, end, valence, valence_classification, kind, labels, associations)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         """.trimIndent()
@@ -91,8 +91,8 @@ class ClickHouseMetricStore(private val config: ClickHouseConfig) : AutoCloseabl
                 stmt.setDouble(4, s.valence ?: 0.0)
                 stmt.setString(5, s.valenceClassification ?: "")
                 stmt.setString(6, s.kind ?: "")
-                val labels = s.labels.joinToString(prefix = "[", postfix = "]", separator = ",") { "'${'$'}it'" }
-                val assoc = s.associations.joinToString(prefix = "[", postfix = "]", separator = ",") { "'${'$'}it'" }
+                val labels = s.labels.joinToString(prefix = "[", postfix = "]", separator = ",") { "'$it'" }
+                val assoc = s.associations.joinToString(prefix = "[", postfix = "]", separator = ",") { "'$it'" }
                 stmt.setString(7, labels)
                 stmt.setString(8, assoc)
                 stmt.addBatch()
@@ -104,12 +104,12 @@ class ClickHouseMetricStore(private val config: ClickHouseConfig) : AutoCloseabl
     suspend fun storeEcg(ecg: List<ECG>) {
         if (ecg.isEmpty()) return
         val sql = """
-            INSERT INTO ${'$'}{config.database}.ecg
+            INSERT INTO ${config.database}.ecg
             (id, classification, source, average_heart_rate, start, end, number_of_voltage_measurements, sampling_frequency)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         """.trimIndent()
         val voltageSql = """
-            INSERT INTO ${'$'}{config.database}.ecg_voltage
+            INSERT INTO ${config.database}.ecg_voltage
             (ecg_id, sample_index, timestamp, voltage, units)
             VALUES (?, ?, ?, ?, ?)
         """.trimIndent()
@@ -165,7 +165,7 @@ class ClickHouseMetricStore(private val config: ClickHouseConfig) : AutoCloseabl
         )
         connection.createStatement().use { stmt ->
             for (table in tables) {
-                stmt.addBatch("OPTIMIZE TABLE ${'$'}{config.database}." + table)
+                stmt.addBatch("OPTIMIZE TABLE ${config.database}." + table)
             }
             stmt.executeBatch()
         }
