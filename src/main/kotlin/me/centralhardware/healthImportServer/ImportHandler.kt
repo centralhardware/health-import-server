@@ -6,11 +6,10 @@ import io.ktor.server.response.respondText
 import me.centralhardware.healthImportServer.request.RequestParser
 import me.centralhardware.healthImportServer.storage.ClickHouseMetricStore
 import kotlinx.coroutines.launch
+import org.slf4j.LoggerFactory
 
-/**
- * Kotlin implementation of the import handler found in handler.go
- */
 class ImportHandler(private val metricStore: ClickHouseMetricStore) {
+    val log = LoggerFactory.getLogger(ImportHandler::class.java)
 
     suspend fun handle(call: ApplicationCall) {
         val export = RequestParser.parse(call.receiveText())
@@ -27,29 +26,29 @@ class ImportHandler(private val metricStore: ClickHouseMetricStore) {
         val ecg = export.ecg
 
         call.application.launch {
-            println("Starting upload to metric store \"${metricStore.name}\".")
+            log.info("Starting upload to ClickHouse")
 
             metrics.takeIf { it.isNotEmpty() }?.let { localMetrics ->
                 metricStore.store(localMetrics)
                 val samples = localMetrics.sumOf { it.data.size }
-                println("Saved ${localMetrics.size} metrics with $samples samples")
+                log.info("Saved ${localMetrics.size} metrics with $samples samples")
             }
             ecg.takeIf { it.isNotEmpty() }?.let { localEcg ->
                 metricStore.storeEcg(localEcg)
                 val voltages = localEcg.sumOf { it.voltageMeasurements.size }
-                println("Saved ${localEcg.size} ECG entries with $voltages voltage measurements")
+                log.info("Saved ${localEcg.size} ECG entries with $voltages voltage measurements")
             }
             workouts.takeIf { it.isNotEmpty() }?.let { localWorkouts ->
                 metricStore.storeWorkouts(localWorkouts)
-                println("Saved ${localWorkouts.size} workouts")
+                log.info("Saved ${localWorkouts.size} workouts")
             }
             stateOfMind.takeIf { it.isNotEmpty() }?.let { localStateOfMind ->
                 metricStore.storeStateOfMind(localStateOfMind)
-                println("Saved ${localStateOfMind.size} state of mind entries")
+                log.info("Saved ${localStateOfMind.size} state of mind entries")
             }
 
             metricStore.optimizeTables()
-            println("Finished upload to metric store \"${metricStore.name}\" and optimized tables.")
+            log.info("Finished upload to clickhouse and optimized tables.")
         }
     }
 }

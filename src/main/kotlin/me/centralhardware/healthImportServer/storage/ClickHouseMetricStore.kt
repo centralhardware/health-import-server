@@ -2,6 +2,7 @@ package me.centralhardware.healthImportServer.storage
 
 import me.centralhardware.healthImportServer.request.*
 import org.flywaydb.core.Flyway
+import org.slf4j.LoggerFactory
 import java.net.URI
 import java.sql.Connection
 import java.sql.DriverManager
@@ -11,8 +12,8 @@ import java.time.LocalDateTime
 import java.time.OffsetDateTime
 import java.time.format.DateTimeFormatter
 
-/** Simple ClickHouse implementation of a metric store. */
 class ClickHouseMetricStore(private val config: ClickHouseConfig) : AutoCloseable {
+    val log = LoggerFactory.getLogger(ClickHouseMetricStore::class.java)
     private val zonedTsFmt = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss Z")
     private val localTsFmt = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
     private val dateFmt = DateTimeFormatter.ofPattern("yyyy-MM-dd")
@@ -35,7 +36,6 @@ class ClickHouseMetricStore(private val config: ClickHouseConfig) : AutoCloseabl
             }
         }
     }
-    val name: String = "clickhouse"
     private val connection: Connection
 
     init {
@@ -57,7 +57,7 @@ class ClickHouseMetricStore(private val config: ClickHouseConfig) : AutoCloseabl
         connection = DriverManager.getConnection(jdbcUrl)
     }
 
-    suspend fun store(metrics: List<Metric>) {
+    fun store(metrics: List<Metric>) {
         if (metrics.isEmpty()) return
         val sql = """
             INSERT INTO ${config.database}.metrics (timestamp, metric_name, metric_unit, qty, min, max, avg, asleep, in_bed, sleep_source, in_bed_source)
@@ -69,7 +69,7 @@ class ClickHouseMetricStore(private val config: ClickHouseConfig) : AutoCloseabl
                 for (s in m.data) {
                     val ts = s.date ?: continue
                     val qty = s.qty ?: 0.0
-                    println("Batching metric: ${m.name} (${m.units}) $ts -> $qty")
+                    log.info("Batching metric: ${m.name} (${m.units}) $ts -> $qty")
                     stmt.setTimestamp(1, parseTs(ts))
                     stmt.setString(2, m.name)
                     stmt.setString(3, m.units)
@@ -90,7 +90,7 @@ class ClickHouseMetricStore(private val config: ClickHouseConfig) : AutoCloseabl
         }
     }
 
-    suspend fun storeWorkouts(workouts: List<Workout>) {
+    fun storeWorkouts(workouts: List<Workout>) {
         if (workouts.isEmpty()) return
         val sql = """
             INSERT INTO ${config.database}.workouts
@@ -125,7 +125,7 @@ class ClickHouseMetricStore(private val config: ClickHouseConfig) : AutoCloseabl
                 stmt.addBatch()
                 count++
             }
-            println("Executing workout batch with $count rows")
+            log.info("Executing workout batch with $count rows")
             stmt.executeBatch()
         }
 
@@ -137,7 +137,7 @@ class ClickHouseMetricStore(private val config: ClickHouseConfig) : AutoCloseabl
         storeWorkoutActiveEnergy(workouts)
     }
 
-    suspend fun storeStateOfMind(stateOfMind: List<StateOfMind>) {
+    fun storeStateOfMind(stateOfMind: List<StateOfMind>) {
         if (stateOfMind.isEmpty()) return
         val sql = """
             INSERT INTO ${config.database}.state_of_mind
@@ -150,7 +150,7 @@ class ClickHouseMetricStore(private val config: ClickHouseConfig) : AutoCloseabl
                 val id = s.id ?: continue
                 val start = s.start ?: continue
                 val end = s.end ?: continue
-                println("Batching state of mind: $s")
+                log.info("Batching state of mind: $s")
                 stmt.setString(1, id)
                 stmt.setTimestamp(2, parseTs(start))
                 stmt.setTimestamp(3, parseTs(end))
@@ -164,12 +164,12 @@ class ClickHouseMetricStore(private val config: ClickHouseConfig) : AutoCloseabl
                 stmt.addBatch()
                 count++
             }
-            println("Executing state of mind batch with $count rows")
+            log.info("Executing state of mind batch with $count rows")
             stmt.executeBatch()
         }
     }
 
-    suspend fun storeEcg(ecg: List<ECG>) {
+    fun storeEcg(ecg: List<ECG>) {
         if (ecg.isEmpty()) return
         val sql = """
             INSERT INTO ${config.database}.ecg
@@ -215,7 +215,7 @@ class ClickHouseMetricStore(private val config: ClickHouseConfig) : AutoCloseabl
                     for (v in e.voltageMeasurements) {
                         val ts = v.date ?: continue
                         val volt = v.voltage ?: continue
-                        println("Batching ECG voltage for $id: $v")
+                        log.info("Batching ECG voltage for $id: $v")
                         voltStmt.setString(1, id)
                         voltStmt.setInt(2, idx++)
                         val instant = java.time.Instant.ofEpochMilli((ts * 1000).toLong())
@@ -226,7 +226,7 @@ class ClickHouseMetricStore(private val config: ClickHouseConfig) : AutoCloseabl
                         voltCount++
                     }
                 }
-                println("Executing ECG batch with $ecgCount entries and $voltCount voltage rows")
+                log.info("Executing ECG batch with $ecgCount entries and $voltCount voltage rows")
                 ecgStmt.executeBatch()
                 voltStmt.executeBatch()
             }
@@ -247,7 +247,7 @@ class ClickHouseMetricStore(private val config: ClickHouseConfig) : AutoCloseabl
                 val start = w.start ?: continue
                 for (r in w.route) {
                     val ts = r.timestamp ?: start
-                    println("Batching workout route for $id: $r")
+                    log.info("Batching workout route for $id: $r")
                     stmt.setString(1, id)
                     stmt.setTimestamp(2, parseTs(ts))
                     stmt.setDouble(3, r.latitude ?: 0.0)
@@ -264,7 +264,7 @@ class ClickHouseMetricStore(private val config: ClickHouseConfig) : AutoCloseabl
                 }
             }
             if (count > 0) {
-                println("Executing workout route batch with $count rows")
+                log.info("Executing workout route batch with $count rows")
                 stmt.executeBatch()
             }
         }
@@ -283,7 +283,7 @@ class ClickHouseMetricStore(private val config: ClickHouseConfig) : AutoCloseabl
                 val start = w.start ?: continue
                 for (h in w.heartRateData) {
                     val ts = h.date ?: start
-                    println("Batching workout heart rate data for $id: $h")
+                    log.info("Batching workout heart rate data for $id: $h")
                     stmt.setString(1, id)
                     stmt.setTimestamp(2, parseTs(ts))
                     stmt.setDouble(3, h.min ?: 0.0)
@@ -296,7 +296,7 @@ class ClickHouseMetricStore(private val config: ClickHouseConfig) : AutoCloseabl
                 }
             }
             if (count > 0) {
-                println("Executing workout heart rate data batch with $count rows")
+                log.info("Executing workout heart rate data batch with $count rows")
                 stmt.executeBatch()
             }
         }
@@ -315,7 +315,7 @@ class ClickHouseMetricStore(private val config: ClickHouseConfig) : AutoCloseabl
                 val start = w.start ?: continue
                 for (h in w.heartRateRecovery) {
                     val ts = h.date ?: start
-                    println("Batching workout heart rate recovery for $id: $h")
+                    log.info("Batching workout heart rate recovery for $id: $h")
                     stmt.setString(1, id)
                     stmt.setTimestamp(2, parseTs(ts))
                     stmt.setDouble(3, h.min ?: 0.0)
@@ -328,7 +328,7 @@ class ClickHouseMetricStore(private val config: ClickHouseConfig) : AutoCloseabl
                 }
             }
             if (count > 0) {
-                println("Executing workout heart rate recovery batch with $count rows")
+                log.info("Executing workout heart rate recovery batch with $count rows")
                 stmt.executeBatch()
             }
         }
@@ -347,7 +347,7 @@ class ClickHouseMetricStore(private val config: ClickHouseConfig) : AutoCloseabl
                 val start = w.start ?: continue
                 for (s in w.stepCount) {
                     val ts = s.date ?: start
-                    println("Batching step count log for $id: $s")
+                    log.info("Batching step count log for $id: $s")
                     stmt.setString(1, id)
                     stmt.setTimestamp(2, parseTs(ts))
                     stmt.setDouble(3, s.qty ?: 0.0)
@@ -358,7 +358,7 @@ class ClickHouseMetricStore(private val config: ClickHouseConfig) : AutoCloseabl
                 }
             }
             if (count > 0) {
-                println("Executing workout step count batch with $count rows")
+                log.info("Executing workout step count batch with $count rows")
                 stmt.executeBatch()
             }
         }
@@ -377,7 +377,7 @@ class ClickHouseMetricStore(private val config: ClickHouseConfig) : AutoCloseabl
                 val start = w.start ?: continue
                 for (s in w.walkingAndRunningDistance) {
                     val ts = s.date ?: start
-                    println("Batching walking/running distance for $id: $s")
+                    log.info("Batching walking/running distance for $id: $s")
                     stmt.setString(1, id)
                     stmt.setTimestamp(2, parseTs(ts))
                     stmt.setDouble(3, s.qty ?: 0.0)
@@ -388,7 +388,7 @@ class ClickHouseMetricStore(private val config: ClickHouseConfig) : AutoCloseabl
                 }
             }
             if (count > 0) {
-                println("Executing workout walking/running distance batch with $count rows")
+                log.info("Executing workout walking/running distance batch with $count rows")
                 stmt.executeBatch()
             }
         }
@@ -407,7 +407,7 @@ class ClickHouseMetricStore(private val config: ClickHouseConfig) : AutoCloseabl
                 val start = w.start ?: continue
                 for (s in w.activeEnergy) {
                     val ts = s.date ?: start
-                    println("Batching workout active energy for $id: $s")
+                    log.info("Batching workout active energy for $id: $s")
                     stmt.setString(1, id)
                     stmt.setTimestamp(2, parseTs(ts))
                     stmt.setDouble(3, s.qty ?: 0.0)
@@ -418,13 +418,13 @@ class ClickHouseMetricStore(private val config: ClickHouseConfig) : AutoCloseabl
                 }
             }
             if (count > 0) {
-                println("Executing workout active energy batch with $count rows")
+                log.info("Executing workout active energy batch with $count rows")
                 stmt.executeBatch()
             }
         }
     }
 
-    suspend fun optimizeTables() {
+    fun optimizeTables() {
         val tables = listOf(
             "metrics",
             "workouts",

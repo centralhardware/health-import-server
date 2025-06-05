@@ -1,15 +1,11 @@
 package me.centralhardware.healthImportServer
 
-import io.ktor.server.application.*
+import io.ktor.server.engine.*
+import io.ktor.server.netty.*
 import io.ktor.server.routing.*
-import io.ktor.server.engine.embeddedServer
-import io.ktor.server.netty.Netty
 import me.centralhardware.healthImportServer.storage.ClickHouseConfig
 import me.centralhardware.healthImportServer.storage.ClickHouseMetricStore
 
-/**
- * Simple Ktor server similar to cmd/server/main.go
- */
 fun main() {
     val metricStore = loadMetricStore()
     val handler = ImportHandler(metricStore)
