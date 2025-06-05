@@ -60,7 +60,7 @@ class ClickHouseMetricStore(private val config: ClickHouseConfig) : AutoCloseabl
     suspend fun store(metrics: List<Metric>) {
         if (metrics.isEmpty()) return
         val sql = """
-            INSERT INTO ${config.database}.metrics (timestamp, metric_name, metric_unit, qty)
+            INSERT INTO ${config.database}.metrics (timestamp, metric_name, metric_unit, qty, min, max, avg, asleep, in_bed, sleep_source, in_bed_source)
             VALUES (?, ?, ?, ?)
         """.trimIndent()
         connection.prepareStatement(sql).use { stmt ->
@@ -74,6 +74,13 @@ class ClickHouseMetricStore(private val config: ClickHouseConfig) : AutoCloseabl
                     stmt.setString(2, m.name)
                     stmt.setString(3, m.units)
                     stmt.setDouble(4, qty)
+                    stmt.setDouble(5, s.min?:  0.0)
+                    stmt.setDouble(6, s.max?:  0.0)
+                    stmt.setDouble(7, s.avg?:  0.0)
+                    stmt.setDouble(8, s.asleep?: 0.0)
+                    stmt.setDouble(9, s.inBed?:  0.0)
+                    stmt.setString(10, s.sleepSource?:  "")
+                    stmt.setString(11, s.inBedSource?:  "")
                     stmt.addBatch()
                     count++
                 }
