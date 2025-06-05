@@ -61,7 +61,7 @@ class ClickHouseMetricStore(private val config: ClickHouseConfig) : AutoCloseabl
         if (metrics.isEmpty()) return
         val sql = """
             INSERT INTO ${config.database}.metrics (timestamp, metric_name, metric_unit, qty, min, max, avg, asleep, in_bed, sleep_source, in_bed_source)
-            VALUES (?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """.trimIndent()
         connection.prepareStatement(sql).use { stmt ->
             var count = 0
