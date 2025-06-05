@@ -1,5 +1,6 @@
 package me.centralhardware.healthImportServer.request
 
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
@@ -53,8 +54,11 @@ data class StepCountLog(
 
 @Serializable
 data class HeartRateLog(
+    @SerialName("Min")
     val min: Double? = null,
+    @SerialName("Max")
     val max: Double? = null,
+    @SerialName("Avg")
     val avg: Double? = null,
     val units: String? = null,
     val source: String? = null,
