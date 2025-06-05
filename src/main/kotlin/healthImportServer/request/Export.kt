@@ -29,8 +29,11 @@ data class Metric(
 data class Sample(
     val date: String? = null,
     val qty: Double? = null,
+    @SerialName("Max")
     val max: Double? = null,
+    @SerialName("Min")
     val min: Double? = null,
+    @SerialName("Avg")
     val avg: Double? = null,
     val asleep: Double? = null,
     val inBed: Double? = null,
