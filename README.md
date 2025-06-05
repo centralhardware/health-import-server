@@ -3,7 +3,7 @@ Storage backend for https://www.healthexportapp.com
 
 Official documentation on the JSON format that the request submodule parses can be found here: https://github.com/Lybron/health-auto-export/wiki/API-Export---JSON-Format
 
-The server is implemented in Kotlin using Ktor and stores metrics in ClickHouse. ECG voltages include an additional `sample_index` column to avoid deduplication when timestamps repeat and use `DateTime64` to preserve sub-second precision.
+The server is implemented in Kotlin using Ktor and stores metrics in ClickHouse. ECG voltages include an additional `sample_index` column to avoid deduplication when timestamps repeat and use `DateTime64` to preserve sub-second precision. Each ECG entry id is generated deterministically from the record data so repeated uploads replace existing rows.
 Database schema migrations are managed with Flyway and run automatically when the server starts. Migration scripts live under `src/main/resources/db/migration` and create all eleven tables (`metrics`, `workouts`, `state_of_mind`, `workout_routes`, `workout_heart_rate_data`, `workout_heart_rate_recovery`, `workout_step_count_log`, `workout_walking_running_distance`, `workout_active_energy`, `ecg`, and `ecg_voltage`).
 
 ## Flyway and ClickHouse

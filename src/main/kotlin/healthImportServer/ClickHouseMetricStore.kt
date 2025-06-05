@@ -183,7 +183,16 @@ class ClickHouseMetricStore(private val config: ClickHouseConfig) : AutoCloseabl
                 for (e in ecg) {
                     val start = e.start ?: continue
                     val end = e.end ?: continue
-                    val id = java.util.UUID.randomUUID().toString()
+                    val base = listOf(
+                        start,
+                        end,
+                        e.classification ?: "",
+                        e.source ?: "",
+                        (e.averageHeartRate ?: 0.0).toString(),
+                        (e.numberOfVoltageMeasurements ?: e.voltageMeasurements.size).toString(),
+                        (e.samplingFrequency ?: 0).toString()
+                    ).joinToString("|")
+                    val id = java.util.UUID.nameUUIDFromBytes(base.toByteArray()).toString()
 
                     println("Batching ECG: $e as id $id")
                     ecgStmt.setString(1, id)
