@@ -28,7 +28,6 @@ fun loadMetricStore(): ClickHouseMetricStore {
         ?: error("CLICKHOUSE_DSN must be set")
     val db = System.getenv("CLICKHOUSE_DATABASE")
         ?: error("CLICKHOUSE_DATABASE must be set")
-    val store = ClickHouseMetricStore(ClickHouseConfig(dsn, db))
-    return store
+    return ClickHouseMetricStore(ClickHouseConfig(dsn, db))
 }
 

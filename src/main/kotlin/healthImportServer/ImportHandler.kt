@@ -5,8 +5,6 @@ import io.ktor.server.request.receiveText
 import io.ktor.server.response.respondText
 import me.centralhardware.healthImportServer.request.RequestParser
 import me.centralhardware.healthImportServer.storage.ClickHouseMetricStore
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
 /**
@@ -15,8 +13,7 @@ import kotlinx.coroutines.launch
 class ImportHandler(private val metricStore: ClickHouseMetricStore) {
 
     suspend fun handle(call: ApplicationCall) {
-        val body = call.receiveText()
-        val export = RequestParser.parse(body)
+        val export = RequestParser.parse(call.receiveText())
         val metrics = export.populatedMetrics()
         val responseMsg = "Processing request. Received ${export.metrics.size} metrics " +
                 "(${metrics.size} populated), ${export.totalSamples()} samples, " +
@@ -25,29 +22,28 @@ class ImportHandler(private val metricStore: ClickHouseMetricStore) {
 
         call.respondText(responseMsg)
 
-        CoroutineScope(Dispatchers.Default).launch {
-            val localMetrics = metrics
-            val localWorkouts = export.workouts
-            val localStateOfMind = export.stateOfMind
-            val localEcg = export.ecg
+        val workouts = export.workouts
+        val stateOfMind = export.stateOfMind
+        val ecg = export.ecg
 
+        call.application.launch {
             println("Starting upload to metric store \"${metricStore.name}\".")
 
-            if (localMetrics.isNotEmpty()) {
+            metrics.takeIf { it.isNotEmpty() }?.let { localMetrics ->
                 metricStore.store(localMetrics)
                 val samples = localMetrics.sumOf { it.data.size }
                 println("Saved ${localMetrics.size} metrics with $samples samples")
             }
-            if (localEcg.isNotEmpty()) {
+            ecg.takeIf { it.isNotEmpty() }?.let { localEcg ->
                 metricStore.storeEcg(localEcg)
                 val voltages = localEcg.sumOf { it.voltageMeasurements.size }
                 println("Saved ${localEcg.size} ECG entries with $voltages voltage measurements")
             }
-            if (localWorkouts.isNotEmpty()) {
+            workouts.takeIf { it.isNotEmpty() }?.let { localWorkouts ->
                 metricStore.storeWorkouts(localWorkouts)
                 println("Saved ${localWorkouts.size} workouts")
             }
-            if (localStateOfMind.isNotEmpty()) {
+            stateOfMind.takeIf { it.isNotEmpty() }?.let { localStateOfMind ->
                 metricStore.storeStateOfMind(localStateOfMind)
                 println("Saved ${localStateOfMind.size} state of mind entries")
             }
