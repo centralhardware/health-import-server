@@ -269,7 +269,7 @@ class ClickHouseMetricStore(private val config: ClickHouseConfig) : AutoCloseabl
         val sql = """
             INSERT INTO ${config.database}.workout_heart_rate_data
             (workout_id, timestamp, min, max, avg, units, source)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
         """.trimIndent()
         connection.prepareStatement(sql).use { stmt ->
             var count = 0
@@ -301,7 +301,7 @@ class ClickHouseMetricStore(private val config: ClickHouseConfig) : AutoCloseabl
         val sql = """
             INSERT INTO ${config.database}.workout_heart_rate_recovery
             (workout_id, timestamp, min, max, avg, units, source)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
         """.trimIndent()
         connection.prepareStatement(sql).use { stmt ->
             var count = 0
