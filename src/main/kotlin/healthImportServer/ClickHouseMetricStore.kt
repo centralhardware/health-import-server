@@ -233,6 +233,7 @@ class ClickHouseMetricStore(private val config: ClickHouseConfig) : AutoCloseabl
                 val start = w.start ?: continue
                 for (r in w.route) {
                     val ts = r.timestamp ?: start
+                    println("Batching workout route for $id: $r")
                     stmt.setString(1, id)
                     stmt.setTimestamp(2, parseTs(ts))
                     stmt.setDouble(3, r.latitude ?: 0.0)
@@ -268,6 +269,7 @@ class ClickHouseMetricStore(private val config: ClickHouseConfig) : AutoCloseabl
                 val start = w.start ?: continue
                 for (h in w.heartRateData) {
                     val ts = h.date ?: start
+                    println("Batching workout heart rate data for $id: $h")
                     stmt.setString(1, id)
                     stmt.setTimestamp(2, parseTs(ts))
                     stmt.setDouble(3, h.qty ?: 0.0)
@@ -300,6 +302,7 @@ class ClickHouseMetricStore(private val config: ClickHouseConfig) : AutoCloseabl
                 val start = w.start ?: continue
                 for (h in w.heartRateRecovery) {
                     val ts = h.date ?: start
+                    println("Batching workout heart rate recovery for $id: $h")
                     stmt.setString(1, id)
                     stmt.setTimestamp(2, parseTs(ts))
                     stmt.setDouble(3, h.qty ?: 0.0)
@@ -332,6 +335,7 @@ class ClickHouseMetricStore(private val config: ClickHouseConfig) : AutoCloseabl
                 val start = w.start ?: continue
                 for (s in w.stepCount) {
                     val ts = s.date ?: start
+                    println("Batching step count log for $id: $s")
                     stmt.setString(1, id)
                     stmt.setTimestamp(2, parseTs(ts))
                     stmt.setDouble(3, s.qty ?: 0.0)
@@ -361,6 +365,7 @@ class ClickHouseMetricStore(private val config: ClickHouseConfig) : AutoCloseabl
                 val start = w.start ?: continue
                 for (s in w.walkingAndRunningDistance) {
                     val ts = s.date ?: start
+                    println("Batching walking/running distance for $id: $s")
                     stmt.setString(1, id)
                     stmt.setTimestamp(2, parseTs(ts))
                     stmt.setDouble(3, s.qty ?: 0.0)
@@ -390,6 +395,7 @@ class ClickHouseMetricStore(private val config: ClickHouseConfig) : AutoCloseabl
                 val start = w.start ?: continue
                 for (s in w.activeEnergy) {
                     val ts = s.date ?: start
+                    println("Batching workout active energy for $id: $s")
                     stmt.setString(1, id)
                     stmt.setTimestamp(2, parseTs(ts))
                     stmt.setDouble(3, s.qty ?: 0.0)
