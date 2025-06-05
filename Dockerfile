@@ -1,14 +1,11 @@
-FROM golang:1.22 AS builder
-ARG VERSION=0.0.0
-WORKDIR /go/src/github.com/joeecarter/health-import-server/
+FROM gradle:8-jdk21 AS builder
+WORKDIR /app
 COPY . .
-RUN CGO_ENABLED=0 go build \
-	-ldflags="-X 'main.Version=$VERSION'" \
-	-o ./server cmd/server/main.go
+RUN gradle installDist --no-daemon
 
-
-FROM alpine:latest  
-COPY --from=builder /go/src/github.com/joeecarter/health-import-server/server /server
-RUN apk --no-cache add ca-certificates
+FROM eclipse-temurin:21-jre
+WORKDIR /app
+COPY --from=builder /app/build/install/health-import-kotlin/ /app/
 EXPOSE 8080
-ENTRYPOINT [ "/server" ]
+ENTRYPOINT ["bin/health-import-kotlin"]
+
