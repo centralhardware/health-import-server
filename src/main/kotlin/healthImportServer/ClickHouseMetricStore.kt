@@ -108,7 +108,6 @@ class ClickHouseMetricStore(private val config: ClickHouseConfig) : AutoCloseabl
                 val id = w.id ?: continue
                 val start = w.start ?: continue
                 val end = w.end ?: continue
-                println("Batching workout: $w")
                 stmt.setString(1, id)
                 stmt.setString(2, w.name ?: "")
                 stmt.setTimestamp(3, parseTs(start))
@@ -201,7 +200,6 @@ class ClickHouseMetricStore(private val config: ClickHouseConfig) : AutoCloseabl
                     ).joinToString("|")
                     val id = java.util.UUID.nameUUIDFromBytes(base.toByteArray()).toString()
 
-                    println("Batching ECG: $e as id $id")
                     ecgStmt.setString(1, id)
                     ecgStmt.setString(2, e.classification ?: "")
                     ecgStmt.setString(3, e.source ?: "")
