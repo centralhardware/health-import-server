@@ -62,8 +62,7 @@ data class HeartRateLog(
     val avg: Double? = null,
     val units: String? = null,
     val source: String? = null,
-    val date: String? = null,
-    val qty: Double? = null
+    val date: String? = null
 )
 
 @Serializable

@@ -268,7 +268,7 @@ class ClickHouseMetricStore(private val config: ClickHouseConfig) : AutoCloseabl
     private fun storeWorkoutHeartRateData(workouts: List<Workout>) {
         val sql = """
             INSERT INTO ${config.database}.workout_heart_rate_data
-            (workout_id, timestamp, qty, min, max, avg, units, source)
+            (workout_id, timestamp, min, max, avg, units, source)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         """.trimIndent()
         connection.prepareStatement(sql).use { stmt ->
@@ -281,12 +281,11 @@ class ClickHouseMetricStore(private val config: ClickHouseConfig) : AutoCloseabl
                     println("Batching workout heart rate data for $id: $h")
                     stmt.setString(1, id)
                     stmt.setTimestamp(2, parseTs(ts))
-                    stmt.setDouble(3, h.qty ?: 0.0)
-                    stmt.setDouble(4, h.min ?: 0.0)
-                    stmt.setDouble(5, h.max ?: 0.0)
-                    stmt.setDouble(6, h.avg ?: 0.0)
-                    stmt.setString(7, h.units ?: "")
-                    stmt.setString(8, h.source ?: "")
+                    stmt.setDouble(3, h.min ?: 0.0)
+                    stmt.setDouble(4, h.max ?: 0.0)
+                    stmt.setDouble(5, h.avg ?: 0.0)
+                    stmt.setString(6, h.units ?: "")
+                    stmt.setString(7, h.source ?: "")
                     stmt.addBatch()
                     count++
                 }
@@ -301,7 +300,7 @@ class ClickHouseMetricStore(private val config: ClickHouseConfig) : AutoCloseabl
     private fun storeWorkoutHeartRateRecovery(workouts: List<Workout>) {
         val sql = """
             INSERT INTO ${config.database}.workout_heart_rate_recovery
-            (workout_id, timestamp, qty, min, max, avg, units, source)
+            (workout_id, timestamp, min, max, avg, units, source)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         """.trimIndent()
         connection.prepareStatement(sql).use { stmt ->
@@ -314,12 +313,11 @@ class ClickHouseMetricStore(private val config: ClickHouseConfig) : AutoCloseabl
                     println("Batching workout heart rate recovery for $id: $h")
                     stmt.setString(1, id)
                     stmt.setTimestamp(2, parseTs(ts))
-                    stmt.setDouble(3, h.qty ?: 0.0)
-                    stmt.setDouble(4, h.min ?: 0.0)
-                    stmt.setDouble(5, h.max ?: 0.0)
-                    stmt.setDouble(6, h.avg ?: 0.0)
-                    stmt.setString(7, h.units ?: "")
-                    stmt.setString(8, h.source ?: "")
+                    stmt.setDouble(3, h.min ?: 0.0)
+                    stmt.setDouble(4, h.max ?: 0.0)
+                    stmt.setDouble(5, h.avg ?: 0.0)
+                    stmt.setString(6, h.units ?: "")
+                    stmt.setString(7, h.source ?: "")
                     stmt.addBatch()
                     count++
                 }
