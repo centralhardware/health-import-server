@@ -1,12 +1,7 @@
 plugins {
-    application
     kotlin("jvm") version "2.2.0"
     kotlin("plugin.serialization") version "2.2.0"
     id("com.google.cloud.tools.jib") version "3.4.5"
-}
-
-application {
-    mainClass.set("me.centralhardware.healthImportServer.ServerKt")
 }
 
 repositories {
@@ -34,7 +29,7 @@ jib {
     to {
     }
     container {
-        mainClass = "MainKt"
+        mainClass = "me.centralhardware.healthImportServer.ServerKt"
         jvmFlags = listOf("-XX:+UseContainerSupport", "-XX:MaxRAMPercentage=75.0")
         creationTime = "USE_CURRENT_TIMESTAMP"
         labels = mapOf(
