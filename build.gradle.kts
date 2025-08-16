@@ -2,6 +2,7 @@ plugins {
     application
     kotlin("jvm") version "2.1.21"
     kotlin("plugin.serialization") version "2.1.21"
+    id("com.google.cloud.tools.jib") version "3.4.5"
 }
 
 application {
@@ -24,6 +25,28 @@ dependencies {
     implementation("org.flywaydb:flyway-database-clickhouse:10.18.0")
     implementation("org.slf4j:slf4j-simple:2.0.17")
     testImplementation(kotlin("test"))
+}
+
+jib {
+    from {
+        image = System.getenv("JIB_FROM_IMAGE") ?: "eclipse-temurin:24-jre"
+    }
+    to {
+    }
+    container {
+        mainClass = "MainKt"
+        jvmFlags = listOf("-XX:+UseContainerSupport", "-XX:MaxRAMPercentage=75.0")
+        creationTime = "USE_CURRENT_TIMESTAMP"
+        labels = mapOf(
+            "org.opencontainers.image.title" to "airportweatherbot",
+            "org.opencontainers.image.source" to (System.getenv("GITHUB_SERVER_URL")?.let { server ->
+                val repo = System.getenv("GITHUB_REPOSITORY")
+                if (repo != null) "$server/$repo" else ""
+            } ?: ""),
+            "org.opencontainers.image.revision" to (System.getenv("GITHUB_SHA") ?: "")
+        )
+        user = "10001"
+    }
 }
 
 kotlin {
