@@ -33,7 +33,6 @@ jib {
         jvmFlags = listOf("-XX:+UseContainerSupport", "-XX:MaxRAMPercentage=75.0")
         creationTime = "USE_CURRENT_TIMESTAMP"
         labels = mapOf(
-            "org.opencontainers.image.title" to "healthimport",
             "org.opencontainers.image.source" to (System.getenv("GITHUB_SERVER_URL")?.let { server ->
                 val repo = System.getenv("GITHUB_REPOSITORY")
                 if (repo != null) "$server/$repo" else ""
